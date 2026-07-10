@@ -31,7 +31,7 @@ TEMPLATE_LIMIT_BYTES = 200_000
 # exist yet are simply skipped, so the pipeline runs cleanly through the build.
 DATA_GROUPS = {
     "inflation_axis": ("inflation_axis.json", True),
-    # "growth_axis":  ("growth_axis.json", False),   # added in a later stage
+    "growth_axis": ("growth_axis.json", True),
     # "quadrant":     ("quadrant.json", False),
     # "asset_read":   ("asset_read.json", False),
 }
