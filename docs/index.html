@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macro Cycle Compass — inflation axis</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Plotly for the inflation trend chart (design.md chart DNA). Version pinned to
+     match the sibling market-regime-dashboard. The render guards on typeof Plotly
+     so the page still works if the CDN is unreachable. -->
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+/* :root token block copied verbatim from C:\dev\design.md — do not fork silently. */
+:root {
+  /* surfaces */
+  --bg: #fafaf8;        /* page background — warm off-white */
+  --bg2: #ffffff;       /* cards, raised surfaces */
+  --bg3: #f5f5f0;       /* table headers, inset chips */
+  --bg4: #eeeee8;       /* progress tracks, deep insets */
+  --bg-hover: #f0f0ea;  /* row / cell hover */
+  /* borders */
+  --bd: #e2e0d8;        /* default hairline */
+  --bd2: #d5d3ca;       /* medium */
+  --bd-strong: #c0beb5; /* emphasis / axis lines */
+  /* text */
+  --t1: #1a1a18;        /* primary — near-black */
+  --t2: #5c5c56;        /* secondary */
+  --t3: #8a8a82;        /* tertiary / labels */
+  --t4: #b0b0a8;        /* disabled / faint */
+  /* semantic: green = gain/long, red = loss/short */
+  --g: #1a8754;  --g2: #22a366;  --g-bg: rgba(26,135,84,0.07);  --g-bg2: rgba(26,135,84,0.14);
+  --r: #c0392b;  --r2: #e74c3c;  --r-bg: rgba(192,57,43,0.07);  --r-bg2: rgba(192,57,43,0.14);
+  /* accents: blue = neutral/benchmark, amber = caution, purple = cost, cyan = info, pink = alt */
+  --b: #2563eb;  --b2: #3b82f6;  --b-bg: rgba(37,99,235,0.06);  --b-bg2: rgba(37,99,235,0.12);
+  --a: #b45309;  --a-bg: rgba(180,83,9,0.07);
+  --p: #7c3aed;  --p-bg: rgba(124,58,237,0.06);
+  --c: #0891b2;  --c-bg: rgba(8,145,178,0.06);
+  --pk: #be185d; --pk-bg: rgba(190,24,93,0.06);
+  /* type */
+  --serif: 'Instrument Serif', Georgia, serif;
+  --sans: 'DM Sans', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', 'Menlo', monospace;
+  /* elevation */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.04);
+  /* radius */
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+/* ---- base ---- */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--t1);
+  font-family: var(--sans); line-height: 1.5;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+a { color: var(--b); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.shell { max-width: 1520px; margin: 0 auto; padding: 20px 32px 60px; }
+.mono { font-family: var(--mono); }
+.label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+  font-weight: 700; color: var(--t3);
+}
+
+/* semantic-for-regime helpers — amber = hotter/above, blue = cooler/below,
+   ink = neutral. Green/red are deliberately NOT used here (no P/L on this page). */
+.hot { color: var(--a); }
+.cool { color: var(--b); }
+.neutral { color: var(--t2); }
+
+/* ---- masthead ---- */
+.masthead {
+  padding: 28px 0 22px; border-bottom: 2px solid var(--t1);
+  display: flex; justify-content: space-between; align-items: flex-end;
+  flex-wrap: wrap; gap: 12px;
+}
+.masthead-left h1 {
+  font-family: var(--serif); font-size: 32px; font-weight: 400;
+  letter-spacing: -0.5px; margin: 0;
+}
+.masthead-left h1 em { font-style: italic; color: var(--t3); }
+.masthead-left .sub { margin: 6px 0 0; color: var(--t2); font-size: 13px; max-width: 60ch; }
+.masthead-right { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.pill {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+  padding: 5px 10px; border-radius: 999px; border: 1px solid var(--bd2);
+  color: var(--t2); background: var(--bg3); white-space: nowrap;
+}
+.pill .mono { font-size: 11px; }
+.pill-proto { color: var(--a); background: var(--a-bg); border-color: rgba(180,83,9,0.28); }
+.pill-date { color: var(--t2); background: var(--bg3); border-color: var(--bd2); }
+
+/* ---- build-state banner ---- */
+.build-banner {
+  margin: 18px 0 22px; padding: 12px 16px; border-radius: var(--radius);
+  background: var(--a-bg); border: 1px solid rgba(180,83,9,0.24);
+  color: var(--t1); font-size: 13px; display: flex; gap: 10px; align-items: baseline;
+}
+.build-banner strong { color: var(--a); }
+
+/* ---- panels ---- */
+.panel {
+  background: var(--bg2); border: 1px solid var(--bd); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); margin: 0 0 22px; overflow: hidden;
+}
+.panel-head {
+  padding: 16px 20px 14px; border-bottom: 1px solid var(--bd);
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.panel-head h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--t2); font-weight: 700; }
+.panel-head .meta { font-size: 12px; color: var(--t3); }
+.panel-body { padding: 20px; }
+
+/* ---- axis read (hero) ---- */
+.read {
+  font-family: var(--serif); font-size: 26px; line-height: 1.28; font-weight: 400;
+  letter-spacing: -0.2px; margin: 0 0 6px; color: var(--t1);
+}
+.read .accent { font-style: italic; }
+.regime-note { margin: 10px 0 0; color: var(--t2); font-size: 14px; max-width: 78ch; }
+
+/* ---- KPI strip ---- */
+.kpi-strip {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px;
+  background: var(--bd); border: 1px solid var(--bd); border-radius: var(--radius-lg);
+  overflow: hidden; margin: 22px 0 4px;
+}
+.kpi { background: var(--bg2); padding: 14px 16px; }
+.kpi-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--t3); }
+.kpi-val { font-family: var(--mono); font-size: 23px; font-weight: 700; letter-spacing: -0.5px; margin: 6px 0 2px; }
+.kpi-sub { font-size: 11.5px; color: var(--t3); line-height: 1.35; }
+
+/* ---- inflation snapshot (dot = YoY, arrow = 6m momentum) ---- */
+.snapshot-wrap { margin: 22px 0 4px; }
+.snapshot-wrap svg { display: block; height: auto; margin: 0 auto; }
+.snapshot-wrap text { font-family: var(--sans); }
+.snapshot-note { margin: 12px 2px 0; font-size: 12.5px; color: var(--t2); line-height: 1.5; max-width: 82ch; }
+
+/* ---- tables ---- */
+.tbl-wrap { overflow-x: auto; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.tbl thead th {
+  position: sticky; top: 0; background: var(--bg3); text-align: right;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--t3);
+  font-weight: 700; padding: 9px 12px; border-bottom: 2px solid var(--bd2); white-space: nowrap;
+}
+table.tbl thead th.l { text-align: left; }
+table.tbl tbody td { padding: 10px 12px; border-bottom: 1px solid var(--bd); text-align: right; white-space: nowrap; }
+table.tbl tbody td.l { text-align: left; }
+table.tbl tbody tr:hover { background: var(--bg-hover); }
+table.tbl tbody tr.context td { color: var(--t2); }
+table.tbl tbody tr.composite { background: var(--bg3); font-weight: 600; }
+table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
+.num { font-family: var(--mono); }
+.name-cell { display: flex; flex-direction: column; gap: 1px; }
+.name-cell .bank { font-size: 10.5px; color: var(--t4); }
+.role-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.role-anchor { color: var(--p); background: var(--p-bg); }
+.role-context { color: var(--t3); background: var(--bg4); }
+.dir-cell { font-weight: 600; }
+.dir-cell .glyph { margin-right: 4px; }
+.src { font-size: 11px; }
+.src a { color: var(--t3); }
+.src a:hover { color: var(--b); }
+.asof { font-family: var(--mono); font-size: 11px; color: var(--t4); }
+
+/* ---- expectations ---- */
+.exp-head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin-bottom: 14px; }
+.exp-badge { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--bd2); }
+.exp-anchored { color: var(--t1); background: var(--bg3); }
+.exp-note { color: var(--t2); font-size: 13px; max-width: 78ch; }
+
+/* ---- nowcast / notes ---- */
+.side-note {
+  margin: 4px 0 0; padding: 12px 16px; border-radius: var(--radius);
+  background: var(--bg3); border: 1px dashed var(--bd2); color: var(--t2); font-size: 12.5px;
+}
+.side-note strong { color: var(--t1); }
+.side-note .deferred { color: var(--a); font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.6px; }
+
+/* ---- footer ---- */
+.foot { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--bd); color: var(--t3); font-size: 12px; line-height: 1.6; }
+.foot h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--t2); margin: 0 0 6px; }
+.foot ul { margin: 0 0 12px; padding-left: 18px; }
+.foot code { font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 1px 5px; border-radius: 4px; }
+
+/* ---- trend chart ---- */
+.plot { width: 100%; height: 380px; }
+.plot.fallback { display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 13px; background: var(--bg3); border-radius: var(--radius); }
+
+/* ---- investment clock ---- */
+.doctrine-flag {
+  margin: 0 0 20px; padding: 12px 16px; border-radius: var(--radius);
+  background: var(--a-bg); border: 1px solid rgba(180,83,9,0.24); color: var(--t1);
+  font-size: 12.5px; line-height: 1.5;
+}
+.doctrine-flag strong { color: var(--a); text-transform: uppercase; letter-spacing: 0.5px; font-size: 10.5px; }
+.clock-wrap { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; }
+.clock-svg { flex: 0 1 460px; min-width: 300px; }
+.clock-svg svg { width: 100%; height: auto; }
+.clock-svg text { font-family: var(--sans); }
+.clock-caption { margin: 6px 2px 0; font-size: 11px; color: var(--t3); line-height: 1.5; text-align: center; }
+.clock-side { flex: 1 1 260px; min-width: 240px; }
+.clock-side h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--t2); margin: 0 0 6px; }
+.qrow { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--bd); }
+.qrow .qname { font-weight: 700; font-size: 13px; }
+.qrow .qgi { font-size: 10.5px; color: var(--t3); margin-left: 6px; }
+.qrow .qasset { font-family: var(--mono); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.clock-now { margin-top: 16px; padding: 12px 14px; background: var(--bg3); border-radius: var(--radius); font-size: 12.5px; color: var(--t2); line-height: 1.5; }
+.clock-now strong { color: var(--t1); }
+
+/* ---- error strip ---- */
+.err { display: none; margin: 18px 0; padding: 14px 18px; border-radius: var(--radius); background: var(--r-bg); border: 1px solid var(--r); color: var(--r); font-size: 13px; }
+
+/* ---- responsive ---- */
+@media (max-width: 1200px) { .kpi-strip { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 768px) {
+  .shell { padding: 16px 18px 48px; }
+  .masthead-left h1 { font-size: 26px; }
+  .read { font-size: 21px; }
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) { .kpi-strip { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="masthead">
+    <div class="masthead-left">
+      <h1>Macro Cycle Compass <em>— inflation axis</em></h1>
+      <p class="sub">Growth &times; inflation regime positioning, built from sourced public data. This first pass renders the inflation axis and its forward expectations overlay; the growth axis and the quadrant follow.</p>
+    </div>
+    <div class="masthead-right" id="pills"></div>
+  </header>
+
+  <div class="build-banner" id="build-banner">
+    <span><strong>Prototype &mdash; 1 of 2 axes.</strong> The inflation axis and expectations overlay are live below. The growth axis, the growth &times; inflation quadrant, the asset-class read, and the framework reconciliation are not yet built, so no regime label or asset prescription is shown.</span>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <!-- INFLATION AXIS -->
+  <section class="panel" id="panel-axis">
+    <div class="panel-head">
+      <h2>Inflation axis &middot; underlying momentum</h2>
+      <span class="meta" id="axis-meta"></span>
+    </div>
+    <div class="panel-body">
+      <p class="read" id="axis-read"></p>
+      <p class="regime-note" id="regime-note"></p>
+
+      <div class="kpi-strip" id="kpis"></div>
+
+      <div class="snapshot-wrap">
+        <div id="snapshot"></div>
+        <p class="snapshot-note" id="snapshot-note"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- INFLATION TREND (time series) -->
+  <section class="panel" id="panel-trend">
+    <div class="panel-head">
+      <h2>Underlying inflation &middot; 10-year trend</h2>
+      <span class="meta" id="trend-meta"></span>
+    </div>
+    <div class="panel-body">
+      <div class="plot" id="trend-chart"></div>
+      <p class="regime-note" id="trend-note" style="font-size:12.5px"></p>
+    </div>
+  </section>
+
+  <!-- INVESTMENT CLOCK (framework, received doctrine) -->
+  <section class="panel" id="panel-clock">
+    <div class="panel-head">
+      <h2>Investment Clock &middot; framework</h2>
+      <span class="meta">Where the asset read will sit once both axes are live.</span>
+    </div>
+    <div class="panel-body">
+      <div class="doctrine-flag">
+        <strong>Received doctrine &middot; uncalibrated.</strong>
+        The four quadrant asset tilts are the canonical Merrill Lynch Investment Clock mapping (Greetham), shown as a reference framework, not calibrated signals. Base rates stay blank pending the forward-return study. The growth axis is not yet built, so no live &ldquo;you are here&rdquo; hand is placed &mdash; only the inflation dimension is live below.
+      </div>
+      <div class="clock-wrap">
+        <div class="clock-svg" id="clock-svg"></div>
+        <div class="clock-side">
+          <h4 id="clock-side-title">Quadrant doctrine</h4>
+          <div id="clock-rows"></div>
+          <div class="clock-now" id="clock-now"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- UNDERLYING MEASURES -->
+  <section class="panel" id="panel-measures">
+    <div class="panel-head">
+      <h2>Underlying &amp; context measures</h2>
+      <span class="meta">Anchor drives the axis; context series shown, not counted.</span>
+    </div>
+    <div class="panel-body">
+      <div class="tbl-wrap">
+        <table class="tbl" id="measures-tbl">
+          <thead>
+            <tr>
+              <th class="l">Measure</th>
+              <th>YoY</th>
+              <th>3m ann.</th>
+              <th>6m ann.</th>
+              <th class="l">Direction</th>
+              <th class="l">vs target</th>
+              <th class="l">As of</th>
+              <th class="l">Source</th>
+            </tr>
+          </thead>
+          <tbody id="measures-body"></tbody>
+        </table>
+      </div>
+      <p class="regime-note" id="gap-note" style="font-size:12.5px"></p>
+    </div>
+  </section>
+
+  <!-- EXPECTATIONS OVERLAY -->
+  <section class="panel" id="panel-exp">
+    <div class="panel-head">
+      <h2>Expectations overlay &middot; forward</h2>
+      <span class="meta">Market-implied and model-expected inflation. Senses turns the realised gauges confirm later.</span>
+    </div>
+    <div class="panel-body">
+      <div class="exp-head">
+        <span class="exp-badge exp-anchored" id="exp-badge"></span>
+        <span class="exp-note" id="exp-note"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl" id="exp-tbl">
+          <thead>
+            <tr>
+              <th class="l">Measure</th>
+              <th>Level</th>
+              <th>3m change</th>
+              <th class="l">Role</th>
+              <th class="l">As of</th>
+              <th class="l">Source</th>
+            </tr>
+          </thead>
+          <tbody id="exp-body"></tbody>
+        </table>
+      </div>
+      <div class="side-note" id="nowcast-note"></div>
+    </div>
+  </section>
+
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<script>
+window.__DATA__ = {"generated_at": "2026-07-10T01:49:06Z", "inflation_axis": {"generated_at": "2026-07-10T00:10:00+00:00", "reference_month": "2026-05-01", "axis": {"anchor": "median_cpi", "level_yoy": 2.85294861601688, "momentum_6m_ann": 3.0721961799477184, "momentum_3m_ann": 3.6332722257771235, "level_bucket": "above target", "direction": "stable", "read": "Underlying inflation 2.9% YoY (above target), 6m momentum 3.1% (stable)."}, "composite_underlying": {"yoy": 2.8148454283189723, "momentum_6m_ann": 3.0392211044426354}, "headline_gap_pp": 1.4170840406633647, "history": {"months": 120, "start": "2016-05-01", "target_cpi": 2.4, "target_pce": 2.0, "note": "Current-vintage (as-revised) 12-month change; descriptive trend context, not the point-in-time classifier input.", "series": [{"key": "median_cpi", "name": "Median CPI", "role": "anchor", "source_id": "MEDCPIM159SFRBCLE", "source_url": "https://www.clevelandfed.org/indicators-and-data/median-cpi", "points": [["2016-06-01", 2.47], ["2016-07-01", 2.51], ["2016-08-01", 2.61], ["2016-09-01", 2.56], ["2016-10-01", 2.54], ["2016-11-01", 2.56], ["2016-12-01", 2.58], ["2017-01-01", 2.64], ["2017-02-01", 2.7], ["2017-03-01", 2.67], ["2017-04-01", 2.48], ["2017-05-01", 2.39], ["2017-06-01", 2.37], ["2017-07-01", 2.34], ["2017-08-01", 2.3], ["2017-09-01", 2.33], ["2017-10-01", 2.36], ["2017-11-01", 2.36], ["2017-12-01", 2.44], ["2018-01-01", 2.5], ["2018-02-01", 2.39], ["2018-03-01", 2.4], ["2018-04-01", 2.51], ["2018-05-01", 2.58], ["2018-06-01", 2.64], ["2018-07-01", 2.64], ["2018-08-01", 2.65], ["2018-09-01", 2.6], ["2018-10-01", 2.62], ["2018-11-01", 2.72], ["2018-12-01", 2.72], ["2019-01-01", 2.62], ["2019-02-01", 2.7], ["2019-03-01", 2.8], ["2019-04-01", 2.79], ["2019-05-01", 2.76], ["2019-06-01", 2.78], ["2019-07-01", 2.87], ["2019-08-01", 2.9], ["2019-09-01", 2.92], ["2019-10-01", 2.92], ["2019-11-01", 2.88], ["2019-12-01", 2.85], ["2020-01-01", 2.91], ["2020-02-01", 2.9], ["2020-03-01", 2.88], ["2020-04-01", 2.83], ["2020-05-01", 2.86], ["2020-06-01", 2.76], ["2020-07-01", 2.78], ["2020-08-01", 2.78], ["2020-09-01", 2.67], ["2020-10-01", 2.6], ["2020-11-01", 2.45], ["2020-12-01", 2.35], ["2021-01-01", 2.16], ["2021-02-01", 2.12], ["2021-03-01", 2.06], ["2021-04-01", 2.11], ["2021-05-01", 2.15], ["2021-06-01", 2.27], ["2021-07-01", 2.23], ["2021-08-01", 2.35], ["2021-09-01", 2.7], ["2021-10-01", 3.13], ["2021-11-01", 3.46], ["2021-12-01", 3.74], ["2022-01-01", 4.17], ["2022-02-01", 4.5], ["2022-03-01", 4.83], ["2022-04-01", 5.16], ["2022-05-01", 5.51], ["2022-06-01", 5.89], ["2022-07-01", 6.22], ["2022-08-01", 6.53], ["2022-09-01", 6.67], ["2022-10-01", 6.71], ["2022-11-01", 6.76], ["2022-12-01", 6.81], ["2023-01-01", 6.85], ["2023-02-01", 6.92], ["2023-03-01", 6.8], ["2023-04-01", 6.64], ["2023-05-01", 6.41], ["2023-06-01", 6.15], ["2023-07-01", 5.84], ["2023-08-01", 5.54], ["2023-09-01", 5.43], ["2023-10-01", 5.18], ["2023-11-01", 5.17], ["2023-12-01", 5.06], ["2024-01-01", 4.96], ["2024-02-01", 4.73], ["2024-03-01", 4.74], ["2024-04-01", 4.67], ["2024-05-01", 4.46], ["2024-06-01", 4.28], ["2024-07-01", 4.22], ["2024-08-01", 4.18], ["2024-09-01", 4.06], ["2024-10-01", 4.01], ["2024-11-01", 3.82], ["2024-12-01", 3.73], ["2025-01-01", 3.6], ["2025-02-01", 3.52], ["2025-03-01", 3.44], ["2025-04-01", 3.42], ["2025-05-01", 3.48], ["2025-06-01", 3.58], ["2025-07-01", 3.65], ["2025-08-01", 3.63], ["2025-09-01", 3.49], ["2025-10-01", 3.28], ["2025-11-01", 3.1], ["2025-12-01", 3.1], ["2026-01-01", 2.97], ["2026-02-01", 2.85], ["2026-03-01", 2.72], ["2026-04-01", 2.8], ["2026-05-01", 2.85]]}, {"key": "trimmed_cpi", "name": "16% Trimmed-mean CPI", "role": "underlying", "source_id": "TRMMEANCPIM159SFRBCLE", "source_url": "https://www.clevelandfed.org/indicators-and-data/median-cpi", "points": [["2016-06-01", 1.93], ["2016-07-01", 1.92], ["2016-08-01", 2.01], ["2016-09-01", 2.0], ["2016-10-01", 2.01], ["2016-11-01", 2.05], ["2016-12-01", 2.15], ["2017-01-01", 2.27], ["2017-02-01", 2.32], ["2017-03-01", 2.24], ["2017-04-01", 2.07], ["2017-05-01", 1.96], ["2017-06-01", 1.87], ["2017-07-01", 1.84], ["2017-08-01", 1.84], ["2017-09-01", 1.78], ["2017-10-01", 1.8], ["2017-11-01", 1.8], ["2017-12-01", 1.85], ["2018-01-01", 1.9], ["2018-02-01", 1.9], ["2018-03-01", 1.95], ["2018-04-01", 2.04], ["2018-05-01", 2.13], ["2018-06-01", 2.21], ["2018-07-01", 2.2], ["2018-08-01", 2.18], ["2018-09-01", 2.21], ["2018-10-01", 2.24], ["2018-11-01", 2.29], ["2018-12-01", 2.35], ["2019-01-01", 2.25], ["2019-02-01", 2.22], ["2019-03-01", 2.3], ["2019-04-01", 2.29], ["2019-05-01", 2.18], ["2019-06-01", 2.16], ["2019-07-01", 2.27], ["2019-08-01", 2.28], ["2019-09-01", 2.28], ["2019-10-01", 2.36], ["2019-11-01", 2.39], ["2019-12-01", 2.33], ["2020-01-01", 2.35], ["2020-02-01", 2.38], ["2020-03-01", 2.32], ["2020-04-01", 2.16], ["2020-05-01", 2.24], ["2020-06-01", 2.26], ["2020-07-01", 2.38], ["2020-08-01", 2.44], ["2020-09-01", 2.38], ["2020-10-01", 2.24], ["2020-11-01", 2.14], ["2020-12-01", 2.11], ["2021-01-01", 1.97], ["2021-02-01", 2.0], ["2021-03-01", 2.08], ["2021-04-01", 2.44], ["2021-05-01", 2.72], ["2021-06-01", 2.98], ["2021-07-01", 3.06], ["2021-08-01", 3.23], ["2021-09-01", 3.57], ["2021-10-01", 4.23], ["2021-11-01", 4.66], ["2021-12-01", 5.02], ["2022-01-01", 5.54], ["2022-02-01", 5.89], ["2022-03-01", 6.18], ["2022-04-01", 6.28], ["2022-05-01", 6.55], ["2022-06-01", 6.88], ["2022-07-01", 6.9], ["2022-08-01", 7.09], ["2022-09-01", 7.17], ["2022-10-01", 6.83], ["2022-11-01", 6.63], ["2022-12-01", 6.55], ["2023-01-01", 6.49], ["2023-02-01", 6.34], ["2023-03-01", 6.02], ["2023-04-01", 5.89], ["2023-05-01", 5.41], ["2023-06-01", 4.9], ["2023-07-01", 4.68], ["2023-08-01", 4.37], ["2023-09-01", 4.16], ["2023-10-01", 3.98], ["2023-11-01", 3.85], ["2023-12-01", 3.66], ["2024-01-01", 3.57], ["2024-02-01", 3.46], ["2024-03-01", 3.56], ["2024-04-01", 3.45], ["2024-05-01", 3.33], ["2024-06-01", 3.24], ["2024-07-01", 3.21], ["2024-08-01", 3.13], ["2024-09-01", 3.08], ["2024-10-01", 3.13], ["2024-11-01", 3.16], ["2024-12-01", 3.14], ["2025-01-01", 3.07], ["2025-02-01", 3.03], ["2025-03-01", 2.93], ["2025-04-01", 2.95], ["2025-05-01", 3.03], ["2025-06-01", 3.15], ["2025-07-01", 3.2], ["2025-08-01", 3.26], ["2025-09-01", 3.16], ["2025-10-01", 2.99], ["2025-11-01", 2.86], ["2025-12-01", 2.91], ["2026-01-01", 2.72], ["2026-02-01", 2.67], ["2026-03-01", 2.64], ["2026-04-01", 2.83], ["2026-05-01", 2.91]]}, {"key": "sticky_core_cpi", "name": "Sticky-price core CPI", "role": "underlying", "source_id": "CORESTICKM159SFRBATL", "source_url": "https://www.atlantafed.org/research-and-data/data/sticky-price-cpi", "points": [["2016-06-01", 2.56], ["2016-07-01", 2.57], ["2016-08-01", 2.72], ["2016-09-01", 2.62], ["2016-10-01", 2.5], ["2016-11-01", 2.52], ["2016-12-01", 2.59], ["2017-01-01", 2.65], ["2017-02-01", 2.66], ["2017-03-01", 2.44], ["2017-04-01", 2.24], ["2017-05-01", 2.14], ["2017-06-01", 2.12], ["2017-07-01", 2.13], ["2017-08-01", 2.08], ["2017-09-01", 2.09], ["2017-10-01", 2.18], ["2017-11-01", 2.1], ["2017-12-01", 2.12], ["2018-01-01", 2.16], ["2018-02-01", 2.12], ["2018-03-01", 2.37], ["2018-04-01", 2.49], ["2018-05-01", 2.54], ["2018-06-01", 2.55], ["2018-07-01", 2.52], ["2018-08-01", 2.43], ["2018-09-01", 2.46], ["2018-10-01", 2.42], ["2018-11-01", 2.48], ["2018-12-01", 2.46], ["2019-01-01", 2.38], ["2019-02-01", 2.38], ["2019-03-01", 2.36], ["2019-04-01", 2.39], ["2019-05-01", 2.36], ["2019-06-01", 2.39], ["2019-07-01", 2.48], ["2019-08-01", 2.63], ["2019-09-01", 2.62], ["2019-10-01", 2.75], ["2019-11-01", 2.77], ["2019-12-01", 2.75], ["2020-01-01", 2.8], ["2020-02-01", 2.79], ["2020-03-01", 2.59], ["2020-04-01", 2.16], ["2020-05-01", 2.0], ["2020-06-01", 2.0], ["2020-07-01", 2.29], ["2020-08-01", 2.22], ["2020-09-01", 1.99], ["2020-10-01", 1.75], ["2020-11-01", 1.71], ["2020-12-01", 1.6], ["2021-01-01", 1.39], ["2021-02-01", 1.42], ["2021-03-01", 1.61], ["2021-04-01", 2.22], ["2021-05-01", 2.57], ["2021-06-01", 2.56], ["2021-07-01", 2.32], ["2021-08-01", 2.32], ["2021-09-01", 2.6], ["2021-10-01", 3.01], ["2021-11-01", 3.19], ["2021-12-01", 3.45], ["2022-01-01", 3.96], ["2022-02-01", 4.28], ["2022-03-01", 4.54], ["2022-04-01", 4.71], ["2022-05-01", 4.96], ["2022-06-01", 5.4], ["2022-07-01", 5.58], ["2022-08-01", 5.94], ["2022-09-01", 6.33], ["2022-10-01", 6.31], ["2022-11-01", 6.43], ["2022-12-01", 6.54], ["2023-01-01", 6.49], ["2023-02-01", 6.53], ["2023-03-01", 6.39], ["2023-04-01", 6.27], ["2023-05-01", 5.98], ["2023-06-01", 5.58], ["2023-07-01", 5.39], ["2023-08-01", 5.16], ["2023-09-01", 4.95], ["2023-10-01", 4.88], ["2023-11-01", 4.7], ["2023-12-01", 4.56], ["2024-01-01", 4.61], ["2024-02-01", 4.41], ["2024-03-01", 4.51], ["2024-04-01", 4.41], ["2024-05-01", 4.31], ["2024-06-01", 4.24], ["2024-07-01", 4.18], ["2024-08-01", 4.11], ["2024-09-01", 4.01], ["2024-10-01", 3.98], ["2024-11-01", 3.89], ["2024-12-01", 3.75], ["2025-01-01", 3.62], ["2025-02-01", 3.52], ["2025-03-01", 3.27], ["2025-04-01", 3.18], ["2025-05-01", 3.17], ["2025-06-01", 3.3], ["2025-07-01", 3.43], ["2025-08-01", 3.43], ["2025-09-01", 3.32], ["2025-10-01", 3.08], ["2025-11-01", 2.95], ["2025-12-01", 3.01], ["2026-01-01", 2.98], ["2026-02-01", 2.9], ["2026-03-01", 2.93], ["2026-04-01", 3.04], ["2026-05-01", 3.09]]}, {"key": "trimmed_pce", "name": "Trimmed-mean PCE", "role": "underlying", "source_id": "PCETRIM12M159SFRBDAL", "source_url": "https://www.dallasfed.org/research/pce", "points": [["2016-06-01", 1.66], ["2016-07-01", 1.67], ["2016-08-01", 1.71], ["2016-09-01", 1.74], ["2016-10-01", 1.82], ["2016-11-01", 1.85], ["2016-12-01", 1.91], ["2017-01-01", 1.95], ["2017-02-01", 1.91], ["2017-03-01", 1.84], ["2017-04-01", 1.78], ["2017-05-01", 1.68], ["2017-06-01", 1.68], ["2017-07-01", 1.64], ["2017-08-01", 1.64], ["2017-09-01", 1.63], ["2017-10-01", 1.63], ["2017-11-01", 1.65], ["2017-12-01", 1.66], ["2018-01-01", 1.72], ["2018-02-01", 1.75], ["2018-03-01", 1.79], ["2018-04-01", 1.76], ["2018-05-01", 1.86], ["2018-06-01", 1.9], ["2018-07-01", 1.93], ["2018-08-01", 1.93], ["2018-09-01", 1.94], ["2018-10-01", 1.96], ["2018-11-01", 2.02], ["2018-12-01", 2.02], ["2019-01-01", 1.91], ["2019-02-01", 1.97], ["2019-03-01", 2.01], ["2019-04-01", 2.13], ["2019-05-01", 2.04], ["2019-06-01", 2.0], ["2019-07-01", 2.04], ["2019-08-01", 2.05], ["2019-09-01", 1.99], ["2019-10-01", 1.97], ["2019-11-01", 1.88], ["2019-12-01", 1.88], ["2020-01-01", 1.93], ["2020-02-01", 1.93], ["2020-03-01", 1.85], ["2020-04-01", 1.73], ["2020-05-01", 1.79], ["2020-06-01", 1.79], ["2020-07-01", 1.84], ["2020-08-01", 1.84], ["2020-09-01", 1.85], ["2020-10-01", 1.8], ["2020-11-01", 1.75], ["2020-12-01", 1.74], ["2021-01-01", 1.74], ["2021-02-01", 1.73], ["2021-03-01", 1.83], ["2021-04-01", 1.94], ["2021-05-01", 2.05], ["2021-06-01", 2.12], ["2021-07-01", 2.15], ["2021-08-01", 2.26], ["2021-09-01", 2.52], ["2021-10-01", 2.81], ["2021-11-01", 3.09], ["2021-12-01", 3.36], ["2022-01-01", 3.7], ["2022-02-01", 3.91], ["2022-03-01", 4.0], ["2022-04-01", 4.07], ["2022-05-01", 4.27], ["2022-06-01", 4.66], ["2022-07-01", 4.76], ["2022-08-01", 5.01], ["2022-09-01", 4.99], ["2022-10-01", 5.01], ["2022-11-01", 4.97], ["2022-12-01", 4.92], ["2023-01-01", 4.85], ["2023-02-01", 4.82], ["2023-03-01", 4.86], ["2023-04-01", 4.91], ["2023-05-01", 4.76], ["2023-06-01", 4.37], ["2023-07-01", 4.23], ["2023-08-01", 3.91], ["2023-09-01", 3.83], ["2023-10-01", 3.6], ["2023-11-01", 3.45], ["2023-12-01", 3.27], ["2024-01-01", 3.25], ["2024-02-01", 3.16], ["2024-03-01", 3.14], ["2024-04-01", 3.02], ["2024-05-01", 2.9], ["2024-06-01", 2.91], ["2024-07-01", 2.86], ["2024-08-01", 2.81], ["2024-09-01", 2.8], ["2024-10-01", 2.87], ["2024-11-01", 2.9], ["2024-12-01", 2.98], ["2025-01-01", 2.77], ["2025-02-01", 2.73], ["2025-03-01", 2.65], ["2025-04-01", 2.64], ["2025-05-01", 2.61], ["2025-06-01", 2.7], ["2025-07-01", 2.69], ["2025-08-01", 2.8], ["2025-09-01", 2.7], ["2025-10-01", 2.55], ["2025-11-01", 2.51], ["2025-12-01", 2.44], ["2026-01-01", 2.41], ["2026-02-01", 2.34], ["2026-03-01", 2.36], ["2026-04-01", 2.34], ["2026-05-01", 2.41]]}, {"key": "headline_cpi", "name": "Headline CPI", "role": "context", "source_id": "CPIAUCSL", "source_url": "https://fred.stlouisfed.org/series/CPIAUCSL", "points": [["2016-05-01", 1.08], ["2016-06-01", 1.08], ["2016-07-01", 0.87], ["2016-08-01", 1.06], ["2016-09-01", 1.55], ["2016-10-01", 1.69], ["2016-11-01", 1.68], ["2016-12-01", 2.05], ["2017-01-01", 2.51], ["2017-02-01", 2.81], ["2017-03-01", 2.44], ["2017-04-01", 2.18], ["2017-05-01", 1.86], ["2017-06-01", 1.64], ["2017-07-01", 1.73], ["2017-08-01", 1.93], ["2017-09-01", 2.18], ["2017-10-01", 2.02], ["2017-11-01", 2.17], ["2017-12-01", 2.13], ["2018-01-01", 2.15], ["2018-02-01", 2.26], ["2018-03-01", 2.33], ["2018-04-01", 2.47], ["2018-05-01", 2.78], ["2018-06-01", 2.81], ["2018-07-01", 2.85], ["2018-08-01", 2.64], ["2018-09-01", 2.33], ["2018-10-01", 2.49], ["2018-11-01", 2.15], ["2018-12-01", 2.0], ["2019-01-01", 1.49], ["2019-02-01", 1.52], ["2019-03-01", 1.88], ["2019-04-01", 2.0], ["2019-05-01", 1.8], ["2019-06-01", 1.67], ["2019-07-01", 1.83], ["2019-08-01", 1.74], ["2019-09-01", 1.68], ["2019-10-01", 1.73], ["2019-11-01", 2.09], ["2019-12-01", 2.32], ["2020-01-01", 2.6], ["2020-02-01", 2.34], ["2020-03-01", 1.49], ["2020-04-01", 0.31], ["2020-05-01", 0.2], ["2020-06-01", 0.72], ["2020-07-01", 1.0], ["2020-08-01", 1.28], ["2020-09-01", 1.39], ["2020-10-01", 1.23], ["2020-11-01", 1.18], ["2020-12-01", 1.32], ["2021-01-01", 1.37], ["2021-02-01", 1.67], ["2021-03-01", 2.67], ["2021-04-01", 4.13], ["2021-05-01", 4.92], ["2021-06-01", 5.3], ["2021-07-01", 5.25], ["2021-08-01", 5.15], ["2021-09-01", 5.35], ["2021-10-01", 6.24], ["2021-11-01", 6.9], ["2021-12-01", 7.17], ["2022-01-01", 7.56], ["2022-02-01", 7.94], ["2022-03-01", 8.57], ["2022-04-01", 8.23], ["2022-05-01", 8.54], ["2022-06-01", 8.98], ["2022-07-01", 8.46], ["2022-08-01", 8.22], ["2022-09-01", 8.19], ["2022-10-01", 7.76], ["2022-11-01", 7.12], ["2022-12-01", 6.4], ["2023-01-01", 6.33], ["2023-02-01", 5.96], ["2023-03-01", 4.92], ["2023-04-01", 4.95], ["2023-05-01", 4.13], ["2023-06-01", 3.07], ["2023-07-01", 3.29], ["2023-08-01", 3.72], ["2023-09-01", 3.69], ["2023-10-01", 3.25], ["2023-11-01", 3.13], ["2023-12-01", 3.32], ["2024-01-01", 3.09], ["2024-02-01", 3.16], ["2024-03-01", 3.49], ["2024-04-01", 3.36], ["2024-05-01", 3.24], ["2024-06-01", 2.97], ["2024-07-01", 2.94], ["2024-08-01", 2.61], ["2024-09-01", 2.43], ["2024-10-01", 2.58], ["2024-11-01", 2.72], ["2024-12-01", 2.87], ["2025-01-01", 2.99], ["2025-02-01", 2.8], ["2025-03-01", 2.38], ["2025-04-01", 2.33], ["2025-05-01", 2.38], ["2025-06-01", 2.68], ["2025-07-01", 2.74], ["2025-08-01", 2.94], ["2025-09-01", 3.02], ["2025-11-01", 2.99], ["2025-12-01", 3.0], ["2026-01-01", 2.83], ["2026-02-01", 2.66], ["2026-03-01", 3.32], ["2026-04-01", 3.95], ["2026-05-01", 4.27]]}]}, "expectations": {"anchored": "anchored", "gap_vs_realised_pp": -0.5729486160168804, "note": "Market prices inflation to fade below the current underlying pace.", "measures": [{"key": "market_5y", "name": "5y breakeven (market)", "role": "expectation", "level": 2.28, "change_3m": -0.28000000000000025, "as_of": "2026-07-09", "source_id": "T5YIE", "source_url": "https://fred.stlouisfed.org/series/T5YIE"}, {"key": "forward_5y5y", "name": "5y5y forward (market)", "role": "anchor", "level": 2.18, "change_3m": 0.08000000000000007, "as_of": "2026-07-09", "source_id": "T5YIFR", "source_url": "https://fred.stlouisfed.org/series/T5YIFR"}, {"key": "model_1y", "name": "1y expected (Cleveland model)", "role": "expectation", "level": 3.01917236, "change_3m": 0.7238771500000003, "as_of": "2026-06-01", "source_id": "EXPINF1YR", "source_url": "https://fred.stlouisfed.org/series/EXPINF1YR"}]}, "nowcast": {"status": "deferred", "note": "Cleveland Fed inflation nowcast is public but not a stable FRED series; needs a dedicated Cleveland-page fetcher before wiring.", "source_url": "https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting"}, "regime_note": "Above target realised (~2.9%), expectations anchored (5y5y 2.2%) — market prices inflation to fade below the current underlying pace.", "measures": [{"key": "median_cpi", "name": "Median CPI", "bank": "Cleveland Fed", "role": "anchor", "yoy": 2.85294861601688, "mom_3m_ann": 3.6332722257771235, "mom_6m_ann": 3.0721961799477184, "direction": "stable", "level_bucket": "above target", "as_of": "2026-05-01", "source_id": "MEDCPIM159SFRBCLE", "source_url": "https://www.clevelandfed.org/indicators-and-data/median-cpi"}, {"key": "trimmed_cpi", "name": "16% Trimmed-mean CPI", "bank": "Cleveland Fed", "role": "underlying", "yoy": 2.90517647625901, "mom_3m_ann": 3.55400255625303, "mom_6m_ann": 3.2375855236561555, "direction": "accelerating", "level_bucket": "above target", "as_of": "2026-05-01", "source_id": "TRMMEANCPIM159SFRBCLE", "source_url": "https://www.clevelandfed.org/indicators-and-data/median-cpi"}, {"key": "sticky_core_cpi", "name": "Sticky-price core CPI", "bank": "Atlanta Fed", "role": "underlying", "yoy": 3.091256621, "mom_3m_ann": 3.3477125013333335, "mom_6m_ann": 3.352102714166667, "direction": "stable", "level_bucket": "above target", "as_of": "2026-05-01", "source_id": "CORESTICKM159SFRBATL", "source_url": "https://www.atlantafed.org/research-and-data/data/sticky-price-cpi"}, {"key": "trimmed_pce", "name": "Trimmed-mean PCE", "bank": "Dallas Fed", "role": "underlying", "yoy": 2.41, "mom_3m_ann": 2.716666666666667, "mom_6m_ann": 2.495, "direction": "stable", "level_bucket": "above target", "as_of": "2026-05-01", "source_id": "PCETRIM12M159SFRBDAL", "source_url": "https://www.dallasfed.org/research/pce"}, {"key": "headline_cpi", "name": "Headline CPI", "bank": "BLS", "role": "context", "yoy": 4.270032656680245, "mom_3m_ann": 8.20407334405855, "mom_6m_ann": 5.560938269410687, "direction": "accelerating", "level_bucket": "well above target", "as_of": "2026-05-01", "source_id": "CPIAUCSL", "source_url": "https://fred.stlouisfed.org/series/CPIAUCSL"}, {"key": "core_pce", "name": "Core PCE", "bank": "BEA", "role": "context", "yoy": 3.412035932904045, "mom_3m_ann": 3.5226197405973547, "mom_6m_ann": 4.141841665701329, "direction": "accelerating", "level_bucket": "well above target", "as_of": "2026-05-01", "source_id": "PCEPILFE", "source_url": "https://fred.stlouisfed.org/series/PCEPILFE"}]}};
+
+/* ---------- formatting helpers (display only; no date arithmetic) ---------- */
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+/* We split a known ISO date string and index MONTHS by (month - 1). JavaScript
+   Date months are 0-indexed, but we never construct a Date here: splitting the
+   string avoids any timezone shift, and this is formatting, not arithmetic. */
+function ymd(iso) { const p = String(iso).split("-").map(Number); return { y: p[0], m: p[1], d: p[2] }; }
+function fmtMonth(iso) { if (!iso) return "—"; const t = ymd(iso); return MONTHS[t.m - 1] + " " + t.y; }
+function fmtDay(iso) { if (!iso) return "—"; const t = ymd(iso); return t.d + " " + MONTHS[t.m - 1] + " " + t.y; }
+
+function pct(x, dp) { if (x == null || isNaN(x)) return "—"; return x.toFixed(dp == null ? 1 : dp) + "%"; }
+function signedPct(x, dp) {
+  if (x == null || isNaN(x)) return "—";
+  const d = dp == null ? 1 : dp; const s = x > 0 ? "+" : x < 0 ? "−" : "";
+  return s + Math.abs(x).toFixed(d) + "%";
+}
+function signedNum(x, dp) {
+  if (x == null || isNaN(x)) return "—";
+  const d = dp == null ? 2 : dp; const s = x > 0 ? "+" : x < 0 ? "−" : "";
+  return s + Math.abs(x).toFixed(d);
+}
+function signedPp(x, dp) {
+  if (x == null || isNaN(x)) return "—";
+  const d = dp == null ? 1 : dp; const s = x > 0 ? "+" : x < 0 ? "−" : "";
+  return s + Math.abs(x).toFixed(d) + "pp";
+}
+
+/* Regime encoding: amber (hot) = above target / accelerating; blue (cool) =
+   below target / decelerating; ink (neutral) = near target / stable. Green and
+   red are reserved for portfolio P/L elsewhere and are not used on this page. */
+function dirMeta(dir) {
+  if (dir === "accelerating") return { glyph: "▲", cls: "hot", label: "Accelerating" };
+  if (dir === "decelerating") return { glyph: "▼", cls: "cool", label: "Decelerating" };
+  if (dir === "stable") return { glyph: "■", cls: "neutral", label: "Stable" };
+  return { glyph: "—", cls: "neutral", label: "n/a" };
+}
+function bucketCls(b) {
+  if (b === "well above target" || b === "above target") return "hot";
+  if (b === "below target") return "cool";
+  return "neutral";
+}
+
+function measureByKey(d, key) { return (d.measures || []).find(function (m) { return m.key === key; }); }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function srcLink(m) {
+  if (!m || !m.source_url) return "—";
+  const id = m.source_id ? '<span class="mono">' + esc(m.source_id) + "</span>" : "source";
+  return '<a class="src-a" href="' + esc(m.source_url) + '" target="_blank" rel="noopener">' + id + " ↗</a>";
+}
+
+/* ---------- inflation snapshot: dot (YoY) + arrow (6m momentum) ---------- */
+/* Green marks the underlying gauges that form the axis; grey marks the
+   headline/core context; the median anchor is ringed. Dot at year-on-year,
+   arrowhead at 6-month annualised momentum (right = firming). Green here
+   denotes the primary axis series, not a profit — a deliberate, flagged
+   exception to the house green/red-for-P/L convention (noted in the footer). */
+const SNAP_ORDER = ['sticky_core_cpi', 'median_cpi', 'trimmed_cpi', 'trimmed_pce', 'headline_cpi', 'core_pce'];
+const SNAP_GREEN = '#1a8754', SNAP_GREY = '#8a8a82', SNAP_MONO = "'JetBrains Mono', monospace";
+
+let SNAP_DATA = null;
+
+function renderSnapshot(d) {
+  if (d) SNAP_DATA = d;
+  d = SNAP_DATA;
+  if (!d) return;
+  const host = document.getElementById('snapshot');
+  const rows = SNAP_ORDER.map(function (k) { return measureByKey(d, k); })
+    .filter(function (m) { return m && !m.error && m.yoy != null; });
+  if (!rows.length) { host.textContent = 'No measure data.'; return; }
+
+  /* Render at 1:1 — the viewBox width tracks the container width — so text and
+     dots keep their intended pixel size rather than being magnified by a fixed
+     viewBox stretched to width:100%. Clamp for legible density, then centre. */
+  const cw = host.clientWidth || 900;
+  const W = Math.round(Math.max(620, Math.min(1500, cw)));   /* full-width, matched to neighbours */
+  const AXMIN = 1.0, AXMAX = 6.0, PX0 = 200, PX1 = W - 116, VALX = W - 94;
+  const xs = function (v) { return PX0 + (Math.max(AXMIN, Math.min(AXMAX, v)) - AXMIN) / (AXMAX - AXMIN) * (PX1 - PX0); };
+  const ROW0 = 82, ROWH = 40, GROUP_GAP = 16;
+
+  const ys = []; let y = ROW0, seenContext = false;
+  rows.forEach(function (m) {
+    if (m.role === 'context' && !seenContext) { y += GROUP_GAP; seenContext = true; }
+    ys.push(y); y += ROWH;
+  });
+  const axisY = y - ROWH + 26;
+  const H = axisY + 28;
+  const bandX0 = xs(1.9), bandX1 = xs(2.7);
+
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:' + W + 'px;height:auto" '
+    + 'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Inflation snapshot: year-on-year dots with 6-month momentum arrows">';
+  svg += '<defs>'
+    + '<marker id="ahG" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="' + SNAP_GREEN + '"/></marker>'
+    + '<marker id="ahX" markerWidth="8" markerHeight="8" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="' + SNAP_GREY + '"/></marker>'
+    + '</defs>';
+
+  svg += '<rect x="' + bandX0.toFixed(1) + '" y="70" width="' + (bandX1 - bandX0).toFixed(1) + '" height="' + (axisY - 70).toFixed(1) + '" fill="rgba(90,90,86,0.09)"/>';
+  svg += '<text x="' + ((bandX0 + bandX1) / 2).toFixed(1) + '" y="64" text-anchor="middle" font-size="10.5" font-weight="600" fill="#8a8a82">~2% objective</text>';
+
+  svg += '<circle cx="14" cy="16" r="5" fill="' + SNAP_GREEN + '"/><text x="25" y="20" font-size="12" font-weight="600" fill="#1a1a18">Underlying — the axis</text>';
+  svg += '<circle cx="204" cy="16" r="5" fill="' + SNAP_GREY + '"/><text x="215" y="20" font-size="12" font-weight="600" fill="#5c5c56">Headline / core — context</text>';
+  svg += '<text x="14" y="41" font-size="10.5" fill="#8a8a82">Dot = year-on-year.  Arrow = 6-month annualised momentum (right = firming).</text>';
+
+  rows.forEach(function (m, i) {
+    const cy = ys[i];
+    const isCtx = m.role === 'context';
+    const isAnchor = m.key === 'median_cpi';
+    const col = isCtx ? SNAP_GREY : SNAP_GREEN;
+    const mom = (m.mom_6m_ann != null) ? m.mom_6m_ann : m.yoy;
+    const x0 = xs(m.yoy), x1 = xs(mom);
+    svg += '<text x="18" y="' + (cy + 4) + '" font-size="13" font-weight="500" fill="#1a1a18">' + esc(m.name)
+      + (isAnchor ? ' <tspan font-size="11" font-weight="500" fill="#8a8a82">anchor</tspan>' : '') + '</text>';
+    if (Math.abs(x1 - x0) > 1) {
+      svg += '<line x1="' + x0.toFixed(1) + '" y1="' + cy + '" x2="' + x1.toFixed(1) + '" y2="' + cy + '" stroke="' + col + '" stroke-width="2" marker-end="url(#' + (isCtx ? 'ahX' : 'ahG') + ')"/>';
+    }
+    if (isAnchor) svg += '<circle cx="' + x0.toFixed(1) + '" cy="' + cy + '" r="9" fill="none" stroke="' + col + '" stroke-width="2"/>';
+    svg += '<circle cx="' + x0.toFixed(1) + '" cy="' + cy + '" r="6" fill="' + col + '"/>';
+    svg += '<text x="' + VALX + '" y="' + (cy + 4) + '" font-size="12.5" font-family="' + SNAP_MONO + '" fill="#5c5c56">' + m.yoy.toFixed(1) + ' → ' + mom.toFixed(1) + '</text>';
+  });
+
+  svg += '<line x1="' + xs(AXMIN).toFixed(1) + '" y1="' + axisY + '" x2="' + xs(AXMAX).toFixed(1) + '" y2="' + axisY + '" stroke="#d5d3ca" stroke-width="1"/>';
+  [1, 2, 3, 4, 5, 6].forEach(function (v) {
+    svg += '<line x1="' + xs(v).toFixed(1) + '" y1="' + axisY + '" x2="' + xs(v).toFixed(1) + '" y2="' + (axisY + 5) + '" stroke="#d5d3ca" stroke-width="1"/>';
+    svg += '<text x="' + xs(v).toFixed(1) + '" y="' + (axisY + 18) + '" text-anchor="middle" font-size="10" font-family="' + SNAP_MONO + '" fill="#8a8a82">' + v + '%</text>';
+  });
+  svg += '</svg>';
+  host.innerHTML = svg;
+
+  document.getElementById('snapshot-note').innerHTML =
+    'The four underlying gauges cluster near the objective; <span class="hot">headline CPI</span> and core PCE sit well to the right with the longest arrows — hotter and firming fastest. The axis reads the green cluster, not the grey outliers.';
+}
+
+/* Keep the snapshot at 1:1 as the viewport width changes. */
+let SNAP_RESIZE_T;
+window.addEventListener('resize', function () {
+  clearTimeout(SNAP_RESIZE_T);
+  SNAP_RESIZE_T = setTimeout(function () { renderSnapshot(); }, 150);
+});
+window.addEventListener('load', function () { renderSnapshot(); });
+
+/* ---------- KPI strip ---------- */
+function buildKpis(d) {
+  const ax = d.axis || {};
+  const exp = d.expectations || {};
+  const dm = dirMeta(ax.direction);
+  const gap = (ax.momentum_6m_ann != null && ax.level_yoy != null) ? (ax.momentum_6m_ann - ax.level_yoy) : null;
+  const anch = exp.anchored || "n/a";
+  const anchCls = anch === "drifting up" ? "hot" : anch === "drifting down" ? "cool" : "neutral";
+  const fwd = (exp.measures || []).find(function (m) { return m.key === "forward_5y5y"; });
+  const comp = d.composite_underlying || {};
+
+  const cells = [
+    { label: "Underlying level", val: pct(ax.level_yoy), cls: bucketCls(ax.level_bucket), sub: "median CPI YoY &middot; " + esc(ax.level_bucket || "") },
+    { label: "6-month momentum", val: pct(ax.momentum_6m_ann), cls: dm.cls, sub: "annualised &middot; 3m " + pct(ax.momentum_3m_ann) },
+    { label: "Direction", val: '<span style="font-size:15px">' + dm.glyph + "</span> " + dm.label, cls: dm.cls, sub: signedPp(gap) + " vs YoY &middot; dead-band ±0.3pp" },
+    { label: "Expectations", val: cap(anch), cls: anchCls, sub: fwd ? "5y5y forward " + pct(fwd.level) : "" },
+    { label: "Headline gap", val: signedPp(d.headline_gap_pp), cls: "hot", sub: "headline CPI over underlying" },
+    { label: "Composite underlying", val: pct(comp.yoy), cls: bucketCls(ax.level_bucket), sub: "mean of 4 underlying gauges" }
+  ];
+  document.getElementById("kpis").innerHTML = cells.map(function (c) {
+    return '<div class="kpi"><div class="kpi-label">' + c.label + '</div>'
+      + '<div class="kpi-val ' + c.cls + '">' + c.val + "</div>"
+      + '<div class="kpi-sub">' + c.sub + "</div></div>";
+  }).join("");
+}
+function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+/* ---------- measures table ---------- */
+function buildMeasures(d) {
+  const body = document.getElementById("measures-body");
+  const order = ["median_cpi", "trimmed_cpi", "sticky_core_cpi", "trimmed_pce", "headline_cpi", "core_pce"];
+  const rows = order.map(function (k) { return measureByKey(d, k); }).filter(Boolean);
+  let html = "";
+  rows.forEach(function (m) {
+    if (m.error) {
+      html += '<tr class="context"><td class="l">' + esc(m.name) + '</td><td colspan="7" class="l" style="color:var(--r)">unavailable: ' + esc(m.error) + "</td></tr>";
+      return;
+    }
+    const dm = dirMeta(m.direction);
+    const isCtx = m.role === "context";
+    const tag = m.role === "anchor" ? '<span class="role-tag role-anchor">anchor</span>'
+      : m.role === "context" ? '<span class="role-tag role-context">context</span>' : "";
+    html += '<tr class="' + (isCtx ? "context" : "") + '">'
+      + '<td class="l"><div class="name-cell"><span>' + esc(m.name) + tag + '</span><span class="bank">' + esc(m.bank) + "</span></div></td>"
+      + '<td class="num">' + pct(m.yoy) + "</td>"
+      + '<td class="num">' + pct(m.mom_3m_ann) + "</td>"
+      + '<td class="num">' + pct(m.mom_6m_ann) + "</td>"
+      + '<td class="l dir-cell ' + dm.cls + '"><span class="glyph">' + dm.glyph + "</span>" + dm.label + "</td>"
+      + '<td class="l ' + bucketCls(m.level_bucket) + '">' + esc(m.level_bucket) + "</td>"
+      + '<td class="l asof">' + fmtMonth(m.as_of) + "</td>"
+      + '<td class="l src">' + srcLink(m) + "</td>"
+      + "</tr>";
+  });
+
+  const comp = d.composite_underlying || {};
+  html += '<tr class="composite"><td class="l">Composite underlying <span style="font-weight:400;color:var(--t3)">(4-gauge mean)</span></td>'
+    + '<td class="num">' + pct(comp.yoy) + '</td><td class="num">—</td>'
+    + '<td class="num">' + pct(comp.momentum_6m_ann) + '</td>'
+    + '<td class="l"></td><td class="l"></td><td class="l"></td><td class="l"></td></tr>';
+  body.innerHTML = html;
+
+  const gn = document.getElementById("gap-note");
+  if (d.headline_gap_pp != null) {
+    gn.innerHTML = "Headline-over-underlying gap <strong class=\"num hot\">" + signedPp(d.headline_gap_pp)
+      + "</strong> (headline CPI minus median CPI). A wide positive gap says the headline print is being pushed by volatile categories the underlying gauges strip out — the reason the axis is anchored on median CPI, not headline.";
+  }
+}
+
+/* ---------- expectations ---------- */
+function buildExpectations(d) {
+  const exp = d.expectations || {};
+  const anch = exp.anchored || "n/a";
+  const anchCls = anch === "drifting up" ? "hot" : anch === "drifting down" ? "cool" : "neutral";
+  const badge = document.getElementById("exp-badge");
+  badge.innerHTML = "Long-run expectations: <span class=\"" + anchCls + "\">" + cap(anch) + "</span>";
+  document.getElementById("exp-note").innerHTML = esc(exp.note || "")
+    + (exp.gap_vs_realised_pp != null ? " <span class=\"num\" style=\"color:var(--t3)\">(gap vs realised " + signedPp(exp.gap_vs_realised_pp) + ")</span>" : "");
+
+  const body = document.getElementById("exp-body");
+  let html = "";
+  (exp.measures || []).forEach(function (m) {
+    if (m.error) {
+      html += '<tr><td class="l">' + esc(m.name) + '</td><td colspan="5" class="l" style="color:var(--r)">unavailable: ' + esc(m.error) + "</td></tr>";
+      return;
+    }
+    const role = m.role === "anchor" ? "anchor (5y5y)" : (m.role || "expectation");
+    /* 3-month change: cooling (down) = blue, firming (up) = amber. */
+    const chgCls = m.change_3m > 0.02 ? "hot" : m.change_3m < -0.02 ? "cool" : "neutral";
+    html += "<tr>"
+      + '<td class="l">' + esc(m.name) + "</td>"
+      + '<td class="num">' + pct(m.level, 2) + "</td>"
+      + '<td class="num ' + chgCls + '">' + signedNum(m.change_3m) + "</td>"
+      + '<td class="l" style="color:var(--t3)">' + esc(role) + "</td>"
+      + '<td class="l asof">' + fmtDay(m.as_of) + "</td>"
+      + '<td class="l src">' + srcLink(m) + "</td>"
+      + "</tr>";
+  });
+  body.innerHTML = html;
+
+  const nc = d.nowcast || {};
+  const ncEl = document.getElementById("nowcast-note");
+  if (nc.status === "deferred") {
+    ncEl.innerHTML = '<span class="deferred">Deferred overlay</span> &nbsp; <strong>Inflation nowcast.</strong> '
+      + esc(nc.note) + ' <a href="' + esc(nc.source_url) + '" target="_blank" rel="noopener">Cleveland Fed ↗</a>';
+  } else {
+    ncEl.style.display = "none";
+  }
+}
+
+/* ---------- masthead pills + footer ---------- */
+function buildChrome(d) {
+  const expDates = (d.expectations && d.expectations.measures || []).map(function (m) { return m.as_of; }).filter(Boolean).sort();
+  const latestExp = expDates.length ? expDates[expDates.length - 1] : null;
+  const pills = [];
+  pills.push('<span class="pill pill-proto">Prototype &middot; inflation axis</span>');
+  pills.push('<span class="pill pill-date">Realised: <span class="mono">' + fmtMonth(d.reference_month) + "</span></span>");
+  if (latestExp) pills.push('<span class="pill pill-date">Expectations: <span class="mono">' + fmtDay(latestExp) + "</span></span>");
+  document.getElementById("pills").innerHTML = pills.join("");
+
+  document.getElementById("axis-meta").textContent = "Reference month " + fmtMonth(d.reference_month) + " · anchor: median CPI";
+
+  const built = d.generated_at ? d.generated_at.replace("T", " ").replace(/(:\d\d)?(Z|\+.*)$/, " UTC") : "—";
+  document.getElementById("foot").innerHTML =
+      '<h3>Method &amp; provenance</h3>'
+    + '<ul>'
+    + '<li><strong>Axis construction.</strong> Level = published 12-month change of median CPI (the anchor, best forecast record). Momentum = 3m / 6m annualised (trailing mean of the published 1-month-annualised prints). Direction = 6m annualised minus 12m YoY, with a pre-committed ±0.3pp dead-band so the axis does not flip on a single noisy print.</li>'
+    + '<li><strong>Underlying, not headline.</strong> The axis is built from outlier-robust and persistence gauges (median, trimmed-mean, sticky-price, trimmed-mean PCE). Headline CPI and core PCE are shown for context only, never counted — a regime axis must not flip on an energy spike.</li>'
+    + '<li><strong>Colour encoding.</strong> In the snapshot, green marks the underlying gauges that form the axis and grey marks headline/core context — a deliberate, flagged exception to the house convention that otherwise reserves green/red for portfolio profit-and-loss. Elsewhere: amber = above target / accelerating, blue = below target / decelerating, neutral ink = near target / stable. Red is not used on this page.</li>'
+    + '<li><strong>Flagged framing.</strong> The 2% PCE objective is treated as ~2.4% on the CPI gauges and 2.0% on the PCE gauge (CPI runs structurally ~0.3–0.4pp above PCE). This is a framing choice, flagged, not a fitted parameter. The inflation nowcast that would close the ~6-week realised-data lag is deferred, not dropped.</li>'
+    + '<li><strong>Provenance.</strong> Every figure carries a FRED / Reserve-Bank source link and an as-of date. Data as generated <span class="mono">' + esc(built) + "</span>.</li>"
+    + '</ul>'
+    + '<p style="color:var(--t4)">Educational / internal research grade. Not investment advice. Growth axis, quadrant, asset read, and reconciliation still to be built.</p>';
+}
+
+/* ---------- inflation trend chart (Plotly) ---------- */
+/* CHART_LAYOUT copied verbatim from C:\dev\design.md (PCC chart DNA). */
+const CHART_LAYOUT = {
+  paper_bgcolor: 'transparent',
+  plot_bgcolor: '#fafaf8',
+  font: { family: 'DM Sans', size: 10, color: '#5c5c56' },
+  margin: { t: 10, b: 10, l: 10, r: 10 },
+  xaxis: {
+    gridcolor: '#eeeee8', linecolor: '#d5d3ca', linewidth: 1, showgrid: false,
+    tickformat: "%b '%y", dtick: 'M2', tickfont: { size: 9 }
+  },
+  yaxis: {
+    gridcolor: '#f0f0ea', linecolor: '#d5d3ca', linewidth: 1, showgrid: true, gridwidth: 1,
+    side: 'right',
+    tickfont: { size: 9, family: 'JetBrains Mono' }
+  },
+  showlegend: true,
+  legend: { x: 0, y: 1.02, orientation: 'h', font: { size: 9 }, bgcolor: 'transparent' },
+  hovermode: 'x unified',
+  hoverlabel: { bgcolor: '#fff', bordercolor: '#d5d3ca', font: { size: 10, family: 'DM Sans' } }
+};
+
+/* Line colours: anchor in ink; the other underlying gauges in muted accents;
+   headline in amber and dotted (the volatile outlier). Green/red stay reserved. */
+const PLOT_COLORS = {
+  median_cpi: '#1a1a18', trimmed_cpi: '#7c3aed', sticky_core_cpi: '#0891b2',
+  trimmed_pce: '#be185d', headline_cpi: '#b45309'
+};
+
+function renderTrend(d) {
+  const el = document.getElementById('trend-chart');
+  const h = d.history;
+  if (!h || !h.series || !h.series.length) { el.className = 'plot fallback'; el.textContent = 'No trend history available.'; return; }
+  if (typeof Plotly === 'undefined') { el.className = 'plot fallback'; el.textContent = 'Chart library did not load (CDN unreachable).'; return; }
+
+  const traces = h.series.map(function (s) {
+    const isHeadline = s.key === 'headline_cpi';
+    const isAnchor = s.key === 'median_cpi';
+    return {
+      x: s.points.map(function (p) { return p[0]; }),
+      y: s.points.map(function (p) { return p[1]; }),
+      name: s.name, type: 'scatter', mode: 'lines',
+      line: { color: PLOT_COLORS[s.key] || '#5c5c56', width: isAnchor ? 2.6 : 1.4, dash: isHeadline ? 'dot' : 'solid' },
+      opacity: isHeadline ? 0.75 : 1,
+      hovertemplate: '%{y:.1f}%<extra>' + s.name + '</extra>'
+    };
+  });
+
+  const anchor = h.series.filter(function (s) { return s.key === 'median_cpi'; })[0];
+  const last = anchor ? anchor.points[anchor.points.length - 1] : null;
+  const shapes = [
+    { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 1.9, y1: 2.7, fillcolor: 'rgba(90,90,86,0.06)', line: { width: 0 }, layer: 'below' },
+    { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: h.target_cpi, y1: h.target_cpi, line: { color: '#c0beb5', width: 1, dash: 'dash' }, layer: 'below' }
+  ];
+  const annotations = [{ xref: 'paper', x: 0.01, y: h.target_cpi, yref: 'y', xanchor: 'left', yanchor: 'bottom', text: '~2% objective (' + h.target_cpi.toFixed(1) + '% CPI-equiv)', showarrow: false, font: { size: 9, color: '#8a8a82' } }];
+  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'left', xshift: 6, yanchor: 'middle', text: 'NOW ' + last[1].toFixed(1) + '%', showarrow: false, font: { size: 9, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 2 });
+
+  Plotly.newPlot(el, traces, {
+    ...CHART_LAYOUT,
+    plot_bgcolor: 'transparent',
+    margin: { t: 10, b: 28, l: 10, r: 54 },
+    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M24' },
+    yaxis: { ...CHART_LAYOUT.yaxis, ticksuffix: '%' },
+    shapes: shapes, annotations: annotations
+  }, { displayModeBar: false, responsive: true });
+
+  document.getElementById('trend-meta').textContent = h.months + ' months · to ' + (last ? fmtMonth(last[0]) : fmtMonth(d.reference_month));
+  document.getElementById('trend-note').innerHTML = 'The four underlying gauges hold near the objective band; <span class="hot">headline CPI</span> (dotted) swings widest — the volatility the axis strips out by anchoring on median CPI. ' + esc(h.note);
+}
+
+/* ---------- investment clock (SVG framework, flagged doctrine) ---------- */
+function renderClock(d) {
+  const ax = d.axis || {};
+  const cx = 250, cy = 250, R = 170;
+  /* pt: clock-angle in degrees (0 = top, clockwise) → [x, y]. */
+  function pt(deg, rad) { const a = deg * Math.PI / 180; return [cx + rad * Math.sin(a), cy - rad * Math.cos(a)]; }
+  function wedge(d1, d2) { const p1 = pt(d1, R), p2 = pt(d2, R); return 'M' + cx + ',' + cy + ' L' + p1[0].toFixed(1) + ',' + p1[1].toFixed(1) + ' A' + R + ',' + R + ' 0 0 1 ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1) + ' Z'; }
+  const WARM = 'rgba(180,83,9,0.10)', COOL = 'rgba(37,99,235,0.08)';
+  /* Growth rises in the top half, inflation rises in the right half. Warm
+     quadrants (right) = inflation rising; cool (left) = inflation falling. */
+  const quads = {
+    recovery: { name: 'RECOVERY', c1: 270, c2: 360, cen: 315, tint: COOL, asset: 'Equities', col: '#2563eb', gi: 'growth ↑ · inflation ↓' },
+    overheat: { name: 'OVERHEAT', c1: 0, c2: 90, cen: 45, tint: WARM, asset: 'Commodities', col: '#b45309', gi: 'growth ↑ · inflation ↑' },
+    stagflation: { name: 'STAGFLATION', c1: 90, c2: 180, cen: 135, tint: WARM, asset: 'Cash', col: '#b45309', gi: 'growth ↓ · inflation ↑' },
+    reflation: { name: 'REFLATION', c1: 180, c2: 270, cen: 225, tint: COOL, asset: 'Bonds', col: '#2563eb', gi: 'growth ↓ · inflation ↓' }
+  };
+  const order = ['reflation', 'recovery', 'overheat', 'stagflation']; /* clockwise cycle */
+
+  /* Live inflation dimension: the 6m-minus-YoY gap positions the horizontal
+     axis; the growth axis (vertical) is pending, so only a column is known. */
+  const gap = (ax.momentum_6m_ann != null && ax.level_yoy != null) ? (ax.momentum_6m_ann - ax.level_yoy) : 0;
+  const frac = Math.max(-0.8, Math.min(0.8, gap / 1.5));
+  const infX = cx + frac * R;
+  const dxc = infX - cx;
+  const half = Math.sqrt(Math.max(0, R * R - dxc * dxc));
+
+  const wedges = order.map(function (k) { const q = quads[k]; return '<path d="' + wedge(q.c1, q.c2) + '" fill="' + q.tint + '" stroke="#d5d3ca" stroke-width="1"/>'; }).join('');
+  const labels = order.map(function (k) {
+    const q = quads[k]; const lp = pt(q.cen, 0.6 * R);
+    return '<text x="' + lp[0].toFixed(0) + '" y="' + (lp[1] - 4).toFixed(0) + '" text-anchor="middle" font-size="14" font-weight="700" fill="#1a1a18">' + q.name + '</text>'
+      + '<text x="' + lp[0].toFixed(0) + '" y="' + (lp[1] + 13).toFixed(0) + '" text-anchor="middle" font-size="11.5" font-weight="700" fill="' + q.col + '">' + q.asset + '</text>';
+  }).join('');
+
+  const svg = '<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Investment Clock framework; inflation dimension live, growth pending">'
+    + '<defs><clipPath id="clockClip"><circle cx="' + cx + '" cy="' + cy + '" r="' + R + '"/></clipPath></defs>'
+    + wedges
+    + '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="#c0beb5" stroke-width="1.5"/>'
+    + '<line x1="' + cx + '" y1="' + (cy - R) + '" x2="' + cx + '" y2="' + (cy + R) + '" stroke="#c0beb5" stroke-width="1" stroke-dasharray="4 4"/>'
+    + '<line x1="' + (cx - R) + '" y1="' + cy + '" x2="' + (cx + R) + '" y2="' + cy + '" stroke="#c0beb5" stroke-width="1"/>'
+    + '<rect x="' + (infX - 12).toFixed(1) + '" y="' + (cy - R) + '" width="24" height="' + (2 * R) + '" fill="rgba(180,83,9,0.13)" clip-path="url(#clockClip)"/>'
+    + '<line x1="' + infX.toFixed(1) + '" y1="' + (cy - half).toFixed(1) + '" x2="' + infX.toFixed(1) + '" y2="' + (cy + half).toFixed(1) + '" stroke="#b45309" stroke-width="1.5" stroke-dasharray="3 3"/>'
+    + '<circle cx="' + infX.toFixed(1) + '" cy="' + cy + '" r="5" fill="#b45309"/>'
+    + '<text x="' + infX.toFixed(1) + '" y="' + (cy - half - 8).toFixed(1) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#b45309">INFLATION NOW</text>'
+    + labels
+    + '<text x="' + cx + '" y="' + (cy - R - 10) + '" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8a8a82">GROWTH ↑ · pending</text>'
+    + '<text x="' + cx + '" y="' + (cy + R + 20) + '" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8a8a82">GROWTH ↓ · pending</text>'
+    + '<circle cx="' + cx + '" cy="' + cy + '" r="4" fill="#1a1a18"/>'
+    + '</svg>'
+    + '<p class="clock-caption">Horizontal axis: inflation direction (left falling · right rising). Vertical axis: growth (pending, Stage 2). Warm quadrants = inflation rising, cool = falling.</p>';
+  document.getElementById('clock-svg').innerHTML = svg;
+
+  const rows = order.map(function (k) {
+    const q = quads[k];
+    return '<div class="qrow"><span><span class="qname">' + cap(q.name.toLowerCase()) + '</span><span class="qgi">' + q.gi + '</span></span>'
+      + '<span class="qasset" style="color:' + q.col + '">' + q.asset + '</span></div>';
+  }).join('');
+  document.getElementById('clock-rows').innerHTML = rows;
+
+  const side = frac > 0.05 ? 'just into the firming side of centre' : (frac < -0.05 ? 'just into the cooling side of centre' : 'at the centre');
+  const dm = dirMeta(ax.direction);
+  document.getElementById('clock-now').innerHTML = '<strong>Now:</strong> inflation is <span class="' + dm.cls + '">' + esc(ax.direction || 'n/a') + '</span>, ' + esc(ax.level_bucket || '') + '. That pins the horizontal position ' + side + '; the growth axis (Stage 2) fixes the vertical and drops the hand into one quadrant.';
+}
+
+/* ---------- top-level render ---------- */
+function render(data) {
+  const d = data && data.inflation_axis;
+  if (!d) { showError("No inflation-axis data in payload."); return; }
+  try {
+    buildChrome(d);
+    document.getElementById("axis-read").textContent = (d.axis && d.axis.read) || "—";
+    document.getElementById("regime-note").textContent = d.regime_note || "";
+    buildKpis(d);
+    renderSnapshot(d);
+    renderTrend(d);
+    renderClock(d);
+    buildMeasures(d);
+    buildExpectations(d);
+  } catch (e) {
+    showError("Render error: " + (e && e.message ? e.message : e));
+    throw e;
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById("err");
+  el.style.display = "block";
+  el.textContent = msg;
+}
+
+function fetchJson(path) {
+  return fetch(path).then(function (response) {
+    if (!response.ok) throw new Error("HTTP " + response.status + " loading " + path);
+    return response.json();
+  });
+}
+
+/* If pipeline.py injected data, render it; otherwise fall back to fetching from
+   data/ so template.html works standalone during development (npx serve .). */
+if (window.__DATA__) {
+  render(window.__DATA__);
+} else {
+  Promise.all([
+    fetchJson("data/inflation_axis.json")
+  ]).then(function (arr) {
+    render({ inflation_axis: arr[0], generated_at: null });
+  }).catch(function (error) {
+    showError("Data failed to load (" + error.message + "). Serve the project root — for example npx serve . — so that data/ is reachable, then open template.html and reload.");
+  });
+}
+</script>
+</body>
+</html>
