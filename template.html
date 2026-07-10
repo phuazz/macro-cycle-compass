@@ -222,6 +222,22 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
 /* ---- error strip ---- */
 .err { display: none; margin: 18px 0; padding: 14px 18px; border-radius: var(--radius); background: var(--r-bg); border: 1px solid var(--r); color: var(--r); font-size: 13px; }
 
+/* ---- regime matrix (hero) ---- */
+.regime-read { font-family: var(--serif); font-size: 25px; line-height: 1.3; letter-spacing: -0.2px; margin: 0 0 22px; color: var(--t1); max-width: 66ch; }
+.regime-read strong { font-weight: 400; }
+.regime-read .accent { font-style: italic; color: var(--t3); font-size: 20px; }
+.regime-wrap { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; }
+.regime-matrix { flex: 1 1 520px; min-width: 320px; }
+.regime-matrix svg { width: 100%; height: auto; display: block; }
+.regime-side { flex: 1 1 250px; min-width: 230px; }
+.regime-side h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--t2); font-weight: 700; margin: 4px 0 12px; }
+.ll-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--bd); }
+.ll-row .ll-name { font-weight: 700; font-size: 14px; }
+.ll-tag { font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.ll-lead { color: var(--g); background: var(--g-bg); }
+.regime-flag { margin-top: 16px; padding: 11px 14px; background: var(--a-bg); border: 1px solid rgba(180,83,9,0.24); border-radius: var(--radius); font-size: 12px; color: var(--t2); line-height: 1.5; }
+.regime-flag strong { color: var(--a); }
+
 /* ---- responsive ---- */
 @media (max-width: 1200px) { .kpi-strip { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 768px) {
@@ -248,6 +264,21 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
   </div>
 
   <div class="err" id="err"></div>
+
+  <!-- REGIME MAP (hero) -->
+  <section class="panel" id="panel-regime">
+    <div class="panel-head">
+      <h2>The regime now &middot; growth &times; inflation</h2>
+      <span class="meta" id="regime-meta"></span>
+    </div>
+    <div class="panel-body">
+      <p class="regime-read" id="regime-read"></p>
+      <div class="regime-wrap">
+        <div class="regime-matrix" id="regime-matrix"></div>
+        <div class="regime-side" id="regime-side"></div>
+      </div>
+    </div>
+  </section>
 
   <!-- INFLATION AXIS -->
   <section class="panel" id="panel-axis">
@@ -971,6 +1002,111 @@ function regimeLabel(hx, vy) {
   return 'Recovery ↔ Reflation boundary';
 }
 
+/* ---------- regime matrix (hero) ---------- */
+/* Four regimes on a growth x inflation grid, design.md semantic colours: green =
+   recovery, amber = overheat, red = stagflation, blue = reflation. A deliberate,
+   flagged extension of the green/red-for-P/L rule to regime character (footer).
+   Position is the signed-off direction x direction read; the trail is the real
+   six-month path of the two momenta from the current-vintage histories. */
+const REGIMES = [
+  { key: 'recovery', name: 'Recovery', plain: 'growth up · prices cooling', tilt: 'textbook: equities', x: 96, y: 44, fill: 'rgba(26,135,84,0.13)', col: '#1a8754', favour: 'Equities' },
+  { key: 'overheat', name: 'Overheat', plain: 'growth up · prices rising', tilt: 'textbook: commodities', x: 309, y: 44, fill: 'rgba(180,83,9,0.13)', col: '#b45309', favour: 'Commodities' },
+  { key: 'reflation', name: 'Reflation', plain: 'growth down · prices cooling', tilt: 'textbook: bonds', x: 96, y: 228, fill: 'rgba(37,99,235,0.11)', col: '#2563eb', favour: 'Bonds' },
+  { key: 'stagflation', name: 'Stagflation', plain: 'growth down · prices rising', tilt: 'textbook: cash', x: 309, y: 228, fill: 'rgba(192,57,43,0.12)', col: '#c0392b', favour: 'Cash' }
+];
+const RG_CX = 306, RG_CY = 224, RG_HW = 210, RG_HH = 180;
+function rgClamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function rgPos(d, g) {
+  const ax = d.axis || {}, gax = (g && g.axis) || {};
+  const infGap = (ax.momentum_6m_ann != null && ax.level_yoy != null) ? ax.momentum_6m_ann - ax.level_yoy : 0;
+  let hx = 0;
+  if (ax.direction === 'accelerating') hx = rgClamp(Math.abs(infGap) / 1.5, 0.28, 0.82);
+  else if (ax.direction === 'decelerating') hx = -rgClamp(Math.abs(infGap) / 1.5, 0.28, 0.82);
+  let vy = 0; const gm = Math.abs(gax.momentum_6m != null ? gax.momentum_6m : 0);
+  if (gax.direction === 'rising') vy = rgClamp(gm / 0.7, 0.28, 0.82);
+  else if (gax.direction === 'falling') vy = -rgClamp(gm / 0.7, 0.28, 0.82);
+  return { hx: hx, vy: vy };
+}
+
+function rgTrail(d, g) {
+  const gh = ((g && g.history && g.history.series) || []).filter(function (s) { return s.key === 'cfnai_ma3'; })[0];
+  const ih = ((d.history && d.history.series) || []).filter(function (s) { return s.key === 'median_cpi'; })[0];
+  if (!gh || !ih) return [];
+  const gp = gh.points, ip = ih.points, W = 6, N = 7, out = [];
+  for (let k = N - 1; k >= 0; k--) {
+    const gi = gp.length - 1 - k, ii = ip.length - 1 - k;
+    if (gi - W < 0 || ii - W < 0) continue;
+    out.push({ x: rgClamp((ip[ii][1] - ip[ii - W][1]) / 1.5, -0.85, 0.85),
+               y: rgClamp((gp[gi][1] - gp[gi - W][1]) / 0.7, -0.85, 0.85), age: k });
+  }
+  return out;
+}
+
+function renderRegimeMatrix(d, g) {
+  const host = document.getElementById('regime-matrix');
+  if (!host) return;
+  const px = function (fx) { return RG_CX + fx * RG_HW; };
+  const py = function (fy) { return RG_CY - fy * RG_HH; };
+
+  let cells = '';
+  REGIMES.forEach(function (r) {
+    const tx = r.x + 103.5;
+    cells += '<rect x="' + r.x + '" y="' + r.y + '" width="207" height="176" rx="7" fill="' + r.fill + '" stroke="' + r.col + '" stroke-opacity="0.55" stroke-width="1"/>'
+      + '<text x="' + tx + '" y="' + (r.y + 64) + '" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="0.5" fill="' + r.col + '">' + r.name.toUpperCase() + '</text>'
+      + '<text x="' + tx + '" y="' + (r.y + 88) + '" text-anchor="middle" font-size="11.5" fill="#5c5c56">' + r.plain + '</text>'
+      + '<text x="' + tx + '" y="' + (r.y + 110) + '" text-anchor="middle" font-size="11" fill="#8a8a82">' + r.tilt + '</text>';
+  });
+
+  const axisL = '<text x="199" y="32" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#8a8a82">PRICES COOLING</text>'
+    + '<text x="413" y="32" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="0.5" fill="#8a8a82">PRICES RISING</text>'
+    + '<text x="90" y="46" text-anchor="end" font-size="11" font-weight="700" letter-spacing="0.5" fill="#8a8a82">GROWTH ↑</text>'
+    + '<text x="90" y="406" text-anchor="end" font-size="11" font-weight="700" letter-spacing="0.5" fill="#8a8a82">GROWTH ↓</text>';
+
+  const trail = rgTrail(d, g);
+  let trailSvg = '';
+  if (trail.length > 1) {
+    trailSvg += '<polyline points="' + trail.map(function (p) { return px(p.x).toFixed(1) + ',' + py(p.y).toFixed(1); }).join(' ') + '" fill="none" stroke="#7c3aed" stroke-width="2" stroke-opacity="0.45" stroke-dasharray="3 4"/>';
+    trail.forEach(function (p) {
+      if (p.age === 0) return;
+      const f = 1 - p.age / 7;
+      trailSvg += '<circle cx="' + px(p.x).toFixed(1) + '" cy="' + py(p.y).toFixed(1) + '" r="' + (2.6 + f * 2).toFixed(1) + '" fill="#7c3aed" fill-opacity="' + (0.3 + f * 0.45).toFixed(2) + '"/>';
+    });
+    trailSvg += '<text x="' + (px(trail[0].x) + 12).toFixed(1) + '" y="' + (py(trail[0].y) + 4).toFixed(1) + '" font-size="10.5" fill="#8a8a82">6 months ago</text>';
+  }
+
+  const pos = rgPos(d, g);
+  const mx = px(pos.hx), my = py(pos.vy);
+  const marker = '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="12" fill="none" stroke="#1a1a18" stroke-width="2"/>'
+    + '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="7" fill="#1a1a18"/>'
+    + '<rect x="' + (mx - 42).toFixed(1) + '" y="' + (my - 42).toFixed(1) + '" width="84" height="20" rx="10" fill="#1a1a18"/>'
+    + '<text x="' + mx.toFixed(1) + '" y="' + (my - 28).toFixed(1) + '" text-anchor="middle" font-size="10.5" font-weight="700" letter-spacing="0.5" fill="#ffffff">WE ARE HERE</text>';
+
+  host.innerHTML = '<svg viewBox="0 0 560 426" role="img" aria-label="Growth and inflation regime map: four regimes with the current position and a six-month path">'
+    + '<title>Regime map with current position</title>' + cells + axisL + trailSvg + marker + '</svg>';
+
+  const ax = d.axis || {}, gax = (g && g.axis) || {};
+  const label = regimeLabel(pos.hx, pos.vy);
+  const read = document.getElementById('regime-read');
+  if (read) {
+    read.innerHTML = 'The map reads <strong>' + esc(label) + '</strong> &mdash; growth ' + esc(gax.direction || 'n/a') + ' ('
+      + esc(gax.level_bucket || '') + '), inflation ' + esc(ax.direction || 'n/a') + ' (' + esc(ax.level_bucket || '') + '). '
+      + '<span class="accent">The economy circles this board clockwise; the trail is the last six months.</span>';
+  }
+  const side = document.getElementById('regime-side');
+  if (side) {
+    const active = REGIMES.filter(function (r) { return label.toLowerCase().indexOf(r.key) >= 0; });
+    const shown = active.length ? active : REGIMES;
+    let html = '<h4>What the textbook map says</h4>';
+    shown.forEach(function (r) {
+      html += '<div class="ll-row"><span class="ll-name" style="color:' + r.col + '">' + r.name + '</span>'
+        + '<span class="ll-tag ll-lead">favours ' + r.favour + '</span></div>';
+    });
+    html += '<div class="regime-flag"><strong>Textbook map &mdash; not advice.</strong> These are the canonical Investment Clock tilts, shown as a reference framework. They are uncalibrated, their success rates stay blank until the forward-return study is filed, and nothing here is a recommendation.</div>';
+    side.innerHTML = html;
+  }
+}
+
 /* ---------- top-level render ---------- */
 function render(data) {
   const d = data && data.inflation_axis;
@@ -978,6 +1114,9 @@ function render(data) {
   if (!d) { showError("No inflation-axis data in payload."); return; }
   try {
     buildChrome(d, g);
+    renderRegimeMatrix(d, g);
+    var rgMeta = document.getElementById("regime-meta");
+    if (rgMeta) rgMeta.textContent = "As of " + fmtMonth(d.reference_month);
     document.getElementById("axis-read").textContent = (d.axis && d.axis.read) || "—";
     document.getElementById("regime-note").textContent = d.regime_note || "";
     buildKpis(d);
