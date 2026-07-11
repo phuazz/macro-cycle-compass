@@ -237,6 +237,8 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
 .ll-lead { color: var(--g); background: var(--g-bg); }
 .regime-flag { margin-top: 16px; padding: 11px 14px; background: var(--a-bg); border: 1px solid rgba(180,83,9,0.24); border-radius: var(--radius); font-size: 12px; color: var(--t2); line-height: 1.5; }
 .regime-flag strong { color: var(--a); }
+.disclaimer { color: var(--t3); font-size: 11.5px; line-height: 1.6; margin: 6px 0 0; }
+.disclaimer strong { color: var(--t2); text-transform: uppercase; letter-spacing: 0.5px; font-size: 10.5px; }
 
 /* ---- compact dial row ---- */
 .dial-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--bd); border: 1px solid var(--bd); border-radius: var(--radius-lg); overflow: hidden; margin: 0 0 24px; }
@@ -302,7 +304,7 @@ details.evidence .ev-body .panel { margin: 0; }
 
   <div class="dial-row" id="dial-row"></div>
 
-  <details class="evidence" id="evidence">
+  <details class="evidence" id="evidence" open>
     <summary>The evidence &middot; how this read is built</summary>
     <div class="ev-body">
 
@@ -703,7 +705,7 @@ function buildChrome(d, g) {
     + '<li><strong>Flagged framing.</strong> The 2% PCE objective is treated as ~2.4% on the CPI gauges and 2.0% on the PCE gauge (CPI runs structurally ~0.3–0.4pp above PCE). This is a framing choice, flagged, not a fitted parameter. The inflation nowcast that would close the ~6-week realised-data lag is deferred, not dropped.</li>'
     + '<li><strong>Provenance.</strong> Every figure carries a FRED / Reserve-Bank source link and an as-of date. Data as generated <span class="mono">' + esc(built) + "</span>.</li>"
     + '</ul>'
-    + '<p style="color:var(--t4)">Educational / internal research grade. Not investment advice. The six-stage clock, the calibrated asset read, and the framework reconciliation are still to be built.</p>';
+    + '<p class="disclaimer"><strong>Disclaimer.</strong> Educational and research use only, built from public data. Nothing on this page is financial advice, a recommendation, or an offer or solicitation to buy or sell any investment, and it should not be relied upon for investment decisions. The regime framework and its asset tilts are illustrative and uncalibrated. The six-stage clock, the calibrated asset read, and the framework reconciliation are still to be built.</p>';
 }
 
 /* ---------- inflation trend chart (Plotly) ---------- */
@@ -1051,7 +1053,7 @@ function renderRegimeMatrix(d, g) {
       html += '<div class="ll-row"><span class="ll-name" style="color:' + r.col + '">' + r.name + '</span>'
         + '<span class="ll-tag ll-lead">favours ' + r.favour + '</span></div>';
     });
-    html += '<div class="regime-flag"><strong>Textbook map &mdash; not advice.</strong> These are the canonical Investment Clock tilts, shown as a reference framework. They are uncalibrated, their success rates stay blank until the forward-return study is filed, and nothing here is a recommendation.</div>';
+    html += '<div class="regime-flag"><strong>Textbook map &mdash; not advice.</strong> The four tilts are the classic Investment Clock doctrine &mdash; a reference framework, not a tested signal and not a recommendation. They are uncalibrated, so no success rates are shown.</div>';
     side.innerHTML = html;
   }
 }
