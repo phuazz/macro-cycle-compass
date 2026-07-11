@@ -763,7 +763,7 @@ function renderTrend(d) {
     { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: h.target_cpi, y1: h.target_cpi, line: { color: '#c0beb5', width: 1, dash: 'dash' }, layer: 'below' }
   ];
   const annotations = [{ xref: 'paper', x: 0.01, y: h.target_cpi, yref: 'y', xanchor: 'left', yanchor: 'bottom', text: '~2% objective', showarrow: false, font: { size: 11, color: '#8a8a82' } }];
-  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'left', xshift: 7, yanchor: 'middle', text: 'now ' + last[1].toFixed(1) + '%', showarrow: false, font: { size: 12, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 4 });
+  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'right', xshift: -4, yanchor: 'bottom', yshift: 8, text: 'now ' + last[1].toFixed(1) + '%', showarrow: false, font: { size: 12, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 4 });
 
   const pts = anchor ? anchor.points : [];
   const xr = pts.length ? [pts[Math.max(0, pts.length - 61)][0], pts[pts.length - 1][0]] : undefined;
@@ -912,7 +912,7 @@ function renderGrowthTrend(g) {
     { xref: 'paper', x: 0.01, y: gHi, yref: 'y', xanchor: 'left', yanchor: 'bottom', text: '+0.70 · Fed inflation-pressure line', showarrow: false, font: { size: 10.5, color: '#8a8a82' } },
     { xref: 'paper', x: 0.01, y: gLo, yref: 'y', xanchor: 'left', yanchor: 'top', text: '−0.70 · Fed recession line', showarrow: false, font: { size: 10.5, color: '#8a8a82' } }
   ];
-  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'left', xshift: 7, yanchor: 'middle', text: 'now ' + signedNum(last[1]), showarrow: false, font: { size: 12, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 4 });
+  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'right', xshift: -4, yanchor: 'bottom', yshift: 8, text: 'now ' + signedNum(last[1]), showarrow: false, font: { size: 12, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 4 });
 
   const gpts = ma3 ? ma3.points : [];
   const gxr = gpts.length ? [gpts[Math.max(0, gpts.length - 61)][0], gpts[gpts.length - 1][0]] : undefined;
