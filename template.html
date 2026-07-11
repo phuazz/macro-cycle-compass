@@ -238,7 +238,27 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
 .regime-flag { margin-top: 16px; padding: 11px 14px; background: var(--a-bg); border: 1px solid rgba(180,83,9,0.24); border-radius: var(--radius); font-size: 12px; color: var(--t2); line-height: 1.5; }
 .regime-flag strong { color: var(--a); }
 
+/* ---- compact dial row ---- */
+.dial-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--bd); border: 1px solid var(--bd); border-radius: var(--radius-lg); overflow: hidden; margin: 0 0 24px; }
+.dial { background: var(--bg2); padding: 18px 22px; }
+.dial-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--t3); }
+.dial-val { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; margin: 6px 0; }
+.dial-val .dial-glyph { font-size: 15px; }
+.dial-sub { font-size: 13px; color: var(--t2); line-height: 1.5; }
+
+/* ---- evidence disclosure ---- */
+details.evidence { margin: 0 0 22px; }
+details.evidence > summary { list-style: none; cursor: pointer; padding: 15px 20px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: var(--t2); background: var(--bg3); border: 1px solid var(--bd); border-radius: var(--radius-lg); display: flex; align-items: center; gap: 9px; user-select: none; }
+details.evidence > summary:hover { background: var(--bg-hover); }
+details.evidence > summary::-webkit-details-marker { display: none; }
+details.evidence > summary::before { content: '▸'; color: var(--t3); font-size: 11px; }
+details.evidence[open] > summary { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+details.evidence[open] > summary::before { content: '▾'; }
+details.evidence .ev-body { display: flex; flex-direction: column; gap: 22px; padding: 22px; border: 1px solid var(--bd); border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--bg); }
+details.evidence .ev-body .panel { margin: 0; }
+
 /* ---- responsive ---- */
+@media (max-width: 768px) { .dial-row { grid-template-columns: 1fr; } }
 @media (max-width: 1200px) { .kpi-strip { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 768px) {
   .shell { padding: 16px 18px 48px; }
@@ -260,7 +280,7 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
   </header>
 
   <div class="build-banner" id="build-banner">
-    <span><strong>Prototype &mdash; both axes live.</strong> The inflation and growth axes now place a live hand on the Investment Clock. The asset tilts remain received doctrine, flagged uncalibrated; the six-stage clock, the calibrated asset read, and the framework reconciliation are still to come, so no asset prescription is issued yet.</span>
+    <span><strong>Prototype &mdash; both axes live.</strong> The growth and inflation axes place a live position on the regime map above. The asset tilts stay received doctrine, flagged uncalibrated; the six-stage clock, the calibrated asset read, and the framework reconciliation are still to come, so no asset prescription is issued yet.</span>
   </div>
 
   <div class="err" id="err"></div>
@@ -279,6 +299,12 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
       </div>
     </div>
   </section>
+
+  <div class="dial-row" id="dial-row"></div>
+
+  <details class="evidence" id="evidence">
+    <summary>The evidence &middot; how this read is built</summary>
+    <div class="ev-body">
 
   <!-- INFLATION AXIS -->
   <section class="panel" id="panel-axis">
@@ -315,29 +341,7 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
     </div>
   </section>
 
-  <!-- INVESTMENT CLOCK (live hand; received-doctrine tilts) -->
-  <section class="panel" id="panel-clock">
-    <div class="panel-head">
-      <h2>Investment Clock &middot; live read</h2>
-      <span class="meta">Both axes place the hand; asset tilts flagged doctrine.</span>
-    </div>
-    <div class="panel-body">
-      <div class="doctrine-flag">
-        <strong>Received doctrine &middot; uncalibrated.</strong>
-        The hand is placed live from the two axes (growth direction &times; inflation direction). The four quadrant asset tilts are the canonical Merrill Lynch Investment Clock mapping (Greetham), shown as a reference framework, not calibrated signals &mdash; base rates stay blank pending the forward-return study. No asset prescription is issued.
-      </div>
-      <div class="clock-wrap">
-        <div class="clock-svg" id="clock-svg"></div>
-        <div class="clock-side">
-          <h4 id="clock-side-title">Quadrant doctrine</h4>
-          <div id="clock-rows"></div>
-          <div class="clock-now" id="clock-now"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- INFLATION TREND (moved below the clock) -->
+  <!-- INFLATION TREND (evidence) -->
   <section class="panel" id="panel-trend">
     <div class="panel-head">
       <h2>Underlying inflation &middot; recent trend</h2>
@@ -418,6 +422,9 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
       <div class="side-note" id="nowcast-note"></div>
     </div>
   </section>
+
+    </div>
+  </details>
 
   <footer class="foot" id="foot"></footer>
 </div>
@@ -1127,6 +1134,29 @@ function renderRegimeMatrix(d, g) {
   }
 }
 
+/* ---------- compact dial row (growth | inflation summary) ---------- */
+function renderDials(d, g) {
+  const host = document.getElementById('dial-row');
+  if (!host) return;
+  const ax = d.axis || {}, gax = (g && g.axis) || {};
+  const gd = growthDir(gax.direction);
+  const idm = dirMeta(ax.direction);
+  const g6 = (gax.momentum_6m != null) ? gax.momentum_6m : 0;
+  const cells = [
+    { label: 'Growth', glyph: gd.glyph, word: gd.label, cls: 'neutral',
+      sub: 'Chicago Fed activity is ' + esc(gax.level_bucket || 'n/a') + ' and ' + esc(gax.direction || '')
+        + ' &mdash; index ' + signedNum(gax.level) + ', ' + (g6 >= 0 ? 'up ' : 'down ') + Math.abs(g6).toFixed(2) + ' over six months.' },
+    { label: 'Inflation', glyph: idm.glyph, word: cap(ax.direction || 'n/a'), cls: idm.cls,
+      sub: 'Underlying inflation is ' + esc(ax.level_bucket || 'n/a') + ' and ' + esc(ax.direction || '')
+        + ' &mdash; median CPI ' + pct(ax.level_yoy) + ' versus the ~2% goal.' }
+  ];
+  host.innerHTML = cells.map(function (c) {
+    return '<div class="dial"><div class="dial-label">' + c.label + '</div>'
+      + '<div class="dial-val ' + c.cls + '"><span class="dial-glyph">' + c.glyph + '</span> ' + c.word + '</div>'
+      + '<div class="dial-sub">' + c.sub + '</div></div>';
+  }).join('');
+}
+
 /* ---------- top-level render ---------- */
 function render(data) {
   const d = data && data.inflation_axis;
@@ -1137,6 +1167,7 @@ function render(data) {
     renderRegimeMatrix(d, g);
     var rgMeta = document.getElementById("regime-meta");
     if (rgMeta) rgMeta.textContent = "As of " + fmtMonth(d.reference_month);
+    renderDials(d, g);
     document.getElementById("axis-read").textContent = (d.axis && d.axis.read) || "—";
     document.getElementById("regime-note").textContent = d.regime_note || "";
     buildKpis(d);
@@ -1149,9 +1180,23 @@ function render(data) {
       renderGrowthTrend(g);
     }
     renderTrend(d);
-    renderClock(d, g);
     buildMeasures(d);
     buildExpectations(d);
+    /* The evidence charts and SVGs render at zero width while the details is
+       collapsed; re-fit them the first time it is opened. */
+    var ev = document.getElementById('evidence');
+    if (ev && !ev._wired) {
+      ev._wired = true;
+      ev.addEventListener('toggle', function () {
+        if (!ev.open) return;
+        renderSnapshot();
+        renderGrowthGauge();
+        ['trend-chart', 'growth-trend-chart'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el && typeof Plotly !== 'undefined' && el.data) { try { Plotly.Plots.resize(el); } catch (e) {} }
+        });
+      });
+    }
   } catch (e) {
     showError("Render error: " + (e && e.message ? e.message : e));
     throw e;
