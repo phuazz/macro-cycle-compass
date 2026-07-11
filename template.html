@@ -259,6 +259,27 @@ details.evidence[open] > summary::before { content: '▾'; }
 details.evidence .ev-body { display: flex; flex-direction: column; gap: 22px; padding: 22px; border: 1px solid var(--bd); border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--bg); }
 details.evidence .ev-body .panel { margin: 0; }
 
+/* ---- indicator states table + small-multiples ---- */
+.mini-lead { font-size: 12.5px; color: var(--t2); margin: 0 0 14px; line-height: 1.5; }
+.mini-lead .hot { color: var(--a); font-weight: 700; } .mini-lead .cool { color: var(--b); font-weight: 700; }
+.states-tbl tbody tr { cursor: pointer; }
+.type-chip { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin-left: 7px; vertical-align: 1px; }
+.tc-anchor { color: var(--p); background: var(--p-bg); }
+.tc-underlying { color: var(--t2); background: var(--bg4); }
+.tc-context { color: var(--t3); background: var(--bg3); }
+.state-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.st-hot { color: var(--a); background: var(--a-bg); }
+.st-cool { color: var(--b); background: var(--b-bg); }
+.st-neutral { color: var(--t2); background: var(--bg3); }
+.mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; }
+.mini { border: 1px solid var(--bd); border-radius: var(--radius); background: var(--bg2); padding: 12px 14px; }
+.mini-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.mini-name { font-weight: 700; font-size: 13px; }
+.mini-now { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--t3); }
+.mini-plot { height: 170px; }
+.mini-src { font-size: 10.5px; margin-top: 4px; }
+.mini-src a { color: var(--t4); }
+
 /* ---- responsive ---- */
 @media (max-width: 768px) { .dial-row { grid-template-columns: 1fr; } }
 @media (max-width: 1200px) { .kpi-strip { grid-template-columns: repeat(3, 1fr); } }
@@ -343,15 +364,42 @@ details.evidence .ev-body .panel { margin: 0; }
     </div>
   </section>
 
-  <!-- INFLATION TREND (evidence) -->
-  <section class="panel" id="panel-trend">
+  <!-- INFLATION GAUGES · STATES (components-style) -->
+  <section class="panel" id="panel-states">
     <div class="panel-head">
-      <h2>Underlying inflation &middot; recent trend</h2>
-      <span class="meta" id="trend-meta"></span>
+      <h2>Inflation gauges &middot; states</h2>
+      <span class="meta" id="states-meta"></span>
     </div>
     <div class="panel-body">
-      <div class="plot" id="trend-chart"></div>
-      <p class="regime-note" id="trend-note" style="font-size:12.5px"></p>
+      <p class="mini-lead">Six underlying and context gauges, each read against the ~2% objective. Click a row to jump to its history.</p>
+      <div class="tbl-wrap">
+        <table class="tbl states-tbl" id="states-tbl">
+          <thead>
+            <tr>
+              <th class="l">Gauge</th>
+              <th>Latest</th>
+              <th>vs target</th>
+              <th class="l">Direction</th>
+              <th class="l">State</th>
+              <th class="l">Source</th>
+            </tr>
+          </thead>
+          <tbody id="states-body"></tbody>
+        </table>
+      </div>
+      <p class="regime-note" id="gap-note" style="font-size:12.5px"></p>
+    </div>
+  </section>
+
+  <!-- INFLATION GAUGES · HISTORIES (small multiples) -->
+  <section class="panel" id="panel-minis">
+    <div class="panel-head">
+      <h2>Inflation gauges &middot; histories</h2>
+      <span class="meta">Five-year trajectory of each gauge against its objective band.</span>
+    </div>
+    <div class="panel-body">
+      <p class="mini-lead"><span class="hot">Amber</span> where a gauge sits above target, <span class="cool">blue</span> where below, grey where near. The shaded band is the ~2% objective; the dashed line is the target.</p>
+      <div class="mini-grid" id="mini-grid"></div>
     </div>
   </section>
 
@@ -364,34 +412,6 @@ details.evidence .ev-body .panel { margin: 0; }
     <div class="panel-body">
       <div class="plot" id="growth-trend-chart"></div>
       <p class="regime-note" id="growth-trend-note" style="font-size:12.5px"></p>
-    </div>
-  </section>
-
-  <!-- UNDERLYING MEASURES -->
-  <section class="panel" id="panel-measures">
-    <div class="panel-head">
-      <h2>Underlying &amp; context measures</h2>
-      <span class="meta">Anchor drives the axis; context series shown, not counted.</span>
-    </div>
-    <div class="panel-body">
-      <div class="tbl-wrap">
-        <table class="tbl" id="measures-tbl">
-          <thead>
-            <tr>
-              <th class="l">Measure</th>
-              <th>YoY</th>
-              <th>3m ann.</th>
-              <th>6m ann.</th>
-              <th class="l">Direction</th>
-              <th class="l">vs target</th>
-              <th class="l">As of</th>
-              <th class="l">Source</th>
-            </tr>
-          </thead>
-          <tbody id="measures-body"></tbody>
-        </table>
-      </div>
-      <p class="regime-note" id="gap-note" style="font-size:12.5px"></p>
     </div>
   </section>
 
@@ -600,46 +620,6 @@ function buildKpis(d) {
 function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
 
 /* ---------- measures table ---------- */
-function buildMeasures(d) {
-  const body = document.getElementById("measures-body");
-  const order = ["median_cpi", "trimmed_cpi", "sticky_core_cpi", "trimmed_pce", "headline_cpi", "core_pce"];
-  const rows = order.map(function (k) { return measureByKey(d, k); }).filter(Boolean);
-  let html = "";
-  rows.forEach(function (m) {
-    if (m.error) {
-      html += '<tr class="context"><td class="l">' + esc(m.name) + '</td><td colspan="7" class="l" style="color:var(--r)">unavailable: ' + esc(m.error) + "</td></tr>";
-      return;
-    }
-    const dm = dirMeta(m.direction);
-    const isCtx = m.role === "context";
-    const tag = m.role === "anchor" ? '<span class="role-tag role-anchor">anchor</span>'
-      : m.role === "context" ? '<span class="role-tag role-context">context</span>' : "";
-    html += '<tr class="' + (isCtx ? "context" : "") + '">'
-      + '<td class="l"><div class="name-cell"><span>' + esc(m.name) + tag + '</span><span class="bank">' + esc(m.bank) + "</span></div></td>"
-      + '<td class="num">' + pct(m.yoy) + "</td>"
-      + '<td class="num">' + pct(m.mom_3m_ann) + "</td>"
-      + '<td class="num">' + pct(m.mom_6m_ann) + "</td>"
-      + '<td class="l dir-cell ' + dm.cls + '"><span class="glyph">' + dm.glyph + "</span>" + dm.label + "</td>"
-      + '<td class="l ' + bucketCls(m.level_bucket) + '">' + esc(m.level_bucket) + "</td>"
-      + '<td class="l asof">' + fmtMonth(m.as_of) + "</td>"
-      + '<td class="l src">' + srcLink(m) + "</td>"
-      + "</tr>";
-  });
-
-  const comp = d.composite_underlying || {};
-  html += '<tr class="composite"><td class="l">Composite underlying <span style="font-weight:400;color:var(--t3)">(4-gauge mean)</span></td>'
-    + '<td class="num">' + pct(comp.yoy) + '</td><td class="num">—</td>'
-    + '<td class="num">' + pct(comp.momentum_6m_ann) + '</td>'
-    + '<td class="l"></td><td class="l"></td><td class="l"></td><td class="l"></td></tr>';
-  body.innerHTML = html;
-
-  const gn = document.getElementById("gap-note");
-  if (d.headline_gap_pp != null) {
-    gn.innerHTML = "Headline-over-underlying gap <strong class=\"num hot\">" + signedPp(d.headline_gap_pp)
-      + "</strong> (headline CPI minus median CPI). A wide positive gap says the headline print is being pushed by volatile categories the underlying gauges strip out — the reason the axis is anchored on median CPI, not headline.";
-  }
-}
-
 /* ---------- expectations ---------- */
 function buildExpectations(d) {
   const exp = d.expectations || {};
@@ -736,51 +716,6 @@ const PLOT_COLORS = {
   median_cpi: '#1a1a18', trimmed_cpi: '#7c3aed', sticky_core_cpi: '#0891b2',
   trimmed_pce: '#be185d', headline_cpi: '#b45309'
 };
-
-function renderTrend(d) {
-  const el = document.getElementById('trend-chart');
-  const h = d.history;
-  if (!h || !h.series || !h.series.length) { el.className = 'plot fallback'; el.textContent = 'No trend history available.'; return; }
-  if (typeof Plotly === 'undefined') { el.className = 'plot fallback'; el.textContent = 'Chart library did not load (CDN unreachable).'; return; }
-
-  const traces = h.series.map(function (s) {
-    const isHeadline = s.key === 'headline_cpi';
-    const isAnchor = s.key === 'median_cpi';
-    return {
-      x: s.points.map(function (p) { return p[0]; }),
-      y: s.points.map(function (p) { return p[1]; }),
-      name: s.name, type: 'scatter', mode: 'lines',
-      line: { color: PLOT_COLORS[s.key] || '#5c5c56', width: isAnchor ? 2.6 : 1.4, dash: isHeadline ? 'dot' : 'solid' },
-      opacity: isHeadline ? 0.75 : 1,
-      hovertemplate: '%{y:.1f}%<extra>' + s.name + '</extra>'
-    };
-  });
-
-  const anchor = h.series.filter(function (s) { return s.key === 'median_cpi'; })[0];
-  const last = anchor ? anchor.points[anchor.points.length - 1] : null;
-  const shapes = [
-    { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 1.9, y1: 2.7, fillcolor: 'rgba(90,90,86,0.06)', line: { width: 0 }, layer: 'below' },
-    { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: h.target_cpi, y1: h.target_cpi, line: { color: '#c0beb5', width: 1, dash: 'dash' }, layer: 'below' }
-  ];
-  const annotations = [{ xref: 'paper', x: 0.01, y: h.target_cpi, yref: 'y', xanchor: 'left', yanchor: 'bottom', text: '~2% objective', showarrow: false, font: { size: 11, color: '#8a8a82' } }];
-  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'right', xshift: -4, yanchor: 'bottom', yshift: 8, text: 'now ' + last[1].toFixed(1) + '%', showarrow: false, font: { size: 12, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 4 });
-
-  const pts = anchor ? anchor.points : [];
-  const xr = pts.length ? [pts[Math.max(0, pts.length - 61)][0], pts[pts.length - 1][0]] : undefined;
-  Plotly.newPlot(el, traces, {
-    ...CHART_LAYOUT,
-    plot_bgcolor: 'transparent',
-    margin: { t: 10, b: 34, l: 10, r: 64 },
-    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M12', tickfont: { size: 12.5 }, range: xr },
-    yaxis: { ...CHART_LAYOUT.yaxis, ticksuffix: '%', tickfont: { size: 12.5, family: 'JetBrains Mono' } },
-    legend: { ...CHART_LAYOUT.legend, font: { size: 12.5 } },
-    hoverlabel: { ...CHART_LAYOUT.hoverlabel, font: { size: 13, family: 'DM Sans' } },
-    shapes: shapes, annotations: annotations
-  }, { displayModeBar: false, responsive: true });
-
-  document.getElementById('trend-meta').textContent = '5-year view · to ' + (last ? fmtMonth(last[0]) : fmtMonth(d.reference_month));
-  document.getElementById('trend-note').innerHTML = 'The four underlying gauges hold near the objective band; <span class="hot">headline CPI</span> (dotted) swings widest — the volatility the axis strips out by anchoring on median CPI. ' + esc(h.note);
-}
 
 /* ---------- growth axis: gauge, KPIs, trend ---------- */
 function growthDir(dir) {
@@ -1081,6 +1016,103 @@ function renderDials(d, g) {
   }).join('');
 }
 
+/* ---------- inflation gauges: states table + small-multiples ---------- */
+/* Target-equivalents per gauge (flagged framing, see the footer): CPI gauges
+   ~2.4%, PCE gauges 2.0%. A gauge reads "above target" beyond +0.3 of its
+   target and "below" beyond -0.5, matching the level-bucket bands. */
+const STATE_ORDER = ['median_cpi', 'trimmed_cpi', 'sticky_core_cpi', 'trimmed_pce', 'headline_cpi', 'core_pce'];
+const TARGETS = { median_cpi: 2.4, trimmed_cpi: 2.4, sticky_core_cpi: 2.4, trimmed_pce: 2.0, headline_cpi: 2.4, core_pce: 2.0 };
+
+function typeChip(role) {
+  if (role === 'anchor') return '<span class="type-chip tc-anchor">anchor</span>';
+  if (role === 'context') return '<span class="type-chip tc-context">context</span>';
+  return '<span class="type-chip tc-underlying">underlying</span>';
+}
+
+function renderStatesTable(d) {
+  const body = document.getElementById('states-body');
+  if (!body) return;
+  const rows = STATE_ORDER.map(function (k) { return measureByKey(d, k); }).filter(function (m) { return m && !m.error; });
+  body.innerHTML = rows.map(function (m) {
+    const tgt = TARGETS[m.key];
+    const vs = (m.yoy != null && tgt != null) ? signedPp(m.yoy - tgt) : '—';
+    const bc = bucketCls(m.level_bucket);
+    const dm = dirMeta(m.direction);
+    return '<tr data-mkey="' + m.key + '">'
+      + '<td class="l"><span class="mini-name" style="font-weight:600">' + esc(m.name) + '</span>' + typeChip(m.role)
+      + '<div style="font-size:10.5px;color:var(--t4)">' + esc(m.bank) + '</div></td>'
+      + '<td class="num">' + pct(m.yoy) + '</td>'
+      + '<td class="num ' + bc + '">' + vs + '</td>'
+      + '<td class="l dir-cell ' + dm.cls + '"><span class="glyph">' + dm.glyph + '</span>' + dm.label + '</td>'
+      + '<td class="l"><span class="state-chip st-' + bc + '">' + esc(m.level_bucket) + '</span></td>'
+      + '<td class="l src">' + srcLink(m) + '</td></tr>';
+  }).join('');
+  body.querySelectorAll('tr[data-mkey]').forEach(function (tr) {
+    tr.addEventListener('click', function () {
+      const el = document.getElementById('mini-' + tr.dataset.mkey);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+  const meta = document.getElementById('states-meta');
+  if (meta) meta.textContent = 'Reference month ' + fmtMonth(d.reference_month);
+  const gn = document.getElementById('gap-note');
+  if (gn && d.headline_gap_pp != null) {
+    gn.innerHTML = 'Headline-over-underlying gap <strong class="num hot">' + signedPp(d.headline_gap_pp)
+      + '</strong> — the volatile categories the underlying gauges strip out, which is why the axis anchors on median CPI.';
+  }
+}
+
+function renderMiniCharts(d) {
+  const grid = document.getElementById('mini-grid');
+  if (!grid) return;
+  const histByKey = {};
+  ((d.history && d.history.series) || []).forEach(function (s) { histByKey[s.key] = s; });
+  grid.innerHTML = STATE_ORDER.map(function (k) {
+    const m = measureByKey(d, k);
+    if (!m || m.error || !histByKey[k]) return '';
+    return '<div class="mini" id="mini-' + k + '">'
+      + '<div class="mini-head"><span class="mini-name">' + esc(m.name) + '</span>' + typeChip(m.role)
+      + '<span class="mini-now">now ' + pct(m.yoy) + '</span></div>'
+      + '<div class="mini-plot" id="mplot-' + k + '"></div>'
+      + '<div class="mini-src">' + srcLink(m) + '</div></div>';
+  }).join('');
+  STATE_ORDER.forEach(function (k) {
+    const s = histByKey[k], m = measureByKey(d, k);
+    if (s && m && !m.error) renderMiniChart('mplot-' + k, s, m);
+  });
+}
+
+function renderMiniChart(elId, series, m) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (typeof Plotly === 'undefined') { el.textContent = 'Chart library did not load.'; return; }
+  const pts = series.points.slice(-61);
+  const x = pts.map(function (p) { return p[0]; }), y = pts.map(function (p) { return p[1]; });
+  const tgt = TARGETS[m.key] != null ? TARGETS[m.key] : 2.4;
+  const hi = tgt + 0.3, lo = tgt - 0.5;
+  const above = y.map(function (v) { return v > hi ? v : null; });
+  const below = y.map(function (v) { return v < lo ? v : null; });
+  const traces = [
+    { x: x, y: y, type: 'scatter', mode: 'lines', line: { color: '#b0b0a8', width: 1.3 }, hovertemplate: '%{y:.1f}%<extra></extra>' },
+    { x: x, y: above, type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#b45309', width: 2.4 }, hoverinfo: 'skip' },
+    { x: x, y: below, type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#2563eb', width: 2.4 }, hoverinfo: 'skip' }
+  ];
+  const shapes = [
+    { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: lo, y1: hi, fillcolor: 'rgba(90,90,86,0.07)', line: { width: 0 }, layer: 'below' },
+    { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: tgt, y1: tgt, line: { color: '#c0beb5', width: 1, dash: 'dash' }, layer: 'below' }
+  ];
+  const last = pts.length ? pts[pts.length - 1] : null;
+  const annotations = last ? [{ x: last[0], y: last[1], xanchor: 'right', xshift: -3, yanchor: 'bottom', yshift: 6, text: last[1].toFixed(1) + '%', showarrow: false, font: { size: 10, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 2 }] : [];
+  Plotly.newPlot(el, traces, {
+    ...CHART_LAYOUT,
+    plot_bgcolor: 'transparent', showlegend: false, height: 170,
+    margin: { t: 8, b: 22, l: 8, r: 40 },
+    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M24', tickfont: { size: 10 } },
+    yaxis: { ...CHART_LAYOUT.yaxis, ticksuffix: '%', tickfont: { size: 10, family: 'JetBrains Mono' } },
+    shapes: shapes, annotations: annotations
+  }, { displayModeBar: false, responsive: true });
+}
+
 /* ---------- top-level render ---------- */
 function render(data) {
   const d = data && data.inflation_axis;
@@ -1103,21 +1135,23 @@ function render(data) {
       renderGrowthGauge(g);
       renderGrowthTrend(g);
     }
-    renderTrend(d);
-    buildMeasures(d);
+    renderStatesTable(d);
+    renderMiniCharts(d);
     buildExpectations(d);
-    /* The evidence charts and SVGs render at zero width while the details is
-       collapsed; re-fit them the first time it is opened. */
+    /* When the evidence is folded then reopened, re-fit the width-dependent
+       charts and SVGs. */
     var ev = document.getElementById('evidence');
     if (ev && !ev._wired) {
       ev._wired = true;
       ev.addEventListener('toggle', function () {
-        if (!ev.open) return;
+        if (!ev.open || typeof Plotly === 'undefined') return;
         renderSnapshot();
         renderGrowthGauge();
-        ['trend-chart', 'growth-trend-chart'].forEach(function (id) {
+        var ids = ['growth-trend-chart'];
+        ((d.history && d.history.series) || []).forEach(function (s) { ids.push('mplot-' + s.key); });
+        ids.forEach(function (id) {
           var el = document.getElementById(id);
-          if (el && typeof Plotly !== 'undefined' && el.data) { try { Plotly.Plots.resize(el); } catch (e) {} }
+          if (el && el.data) { try { Plotly.Plots.resize(el); } catch (e) {} }
         });
       });
     }

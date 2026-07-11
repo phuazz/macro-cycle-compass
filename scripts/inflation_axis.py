@@ -280,7 +280,7 @@ def build() -> dict:
     # headline CPI as the volatile-context outlier. Current-vintage (as-revised)
     # 12-month change — descriptive context, not the point-in-time classifier
     # input (the vintage-safe classification lands with the growth axis).
-    history_keys = ["median_cpi", "trimmed_cpi", "sticky_core_cpi", "trimmed_pce", "headline_cpi"]
+    history_keys = ["median_cpi", "trimmed_cpi", "sticky_core_cpi", "trimmed_pce", "headline_cpi", "core_pce"]
     history_series = []
     for m in RATE_MEASURES + INDEX_MEASURES:
         if m["key"] not in history_keys:
