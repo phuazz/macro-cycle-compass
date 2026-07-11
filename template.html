@@ -195,7 +195,7 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
 @media (max-width: 480px) { .kpi-4 { grid-template-columns: 1fr; } }
 
 /* ---- trend chart ---- */
-.plot { width: 100%; height: 380px; }
+.plot { width: 100%; height: 420px; }
 .plot.fallback { display: flex; align-items: center; justify-content: center; color: var(--t3); font-size: 13px; background: var(--bg3); border-radius: var(--radius); }
 
 /* ---- investment clock ---- */
@@ -340,7 +340,7 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
   <!-- INFLATION TREND (moved below the clock) -->
   <section class="panel" id="panel-trend">
     <div class="panel-head">
-      <h2>Underlying inflation &middot; 10-year trend</h2>
+      <h2>Underlying inflation &middot; recent trend</h2>
       <span class="meta" id="trend-meta"></span>
     </div>
     <div class="panel-body">
@@ -352,7 +352,7 @@ table.tbl tbody tr.composite td { border-top: 2px solid var(--bd2); }
   <!-- GROWTH TREND -->
   <section class="panel" id="panel-growth-trend">
     <div class="panel-head">
-      <h2>Chicago Fed activity &middot; 10-year trend</h2>
+      <h2>Chicago Fed activity &middot; recent trend</h2>
       <span class="meta" id="growth-trend-meta"></span>
     </div>
     <div class="panel-body">
@@ -753,19 +753,23 @@ function renderTrend(d) {
     { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 1.9, y1: 2.7, fillcolor: 'rgba(90,90,86,0.06)', line: { width: 0 }, layer: 'below' },
     { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: h.target_cpi, y1: h.target_cpi, line: { color: '#c0beb5', width: 1, dash: 'dash' }, layer: 'below' }
   ];
-  const annotations = [{ xref: 'paper', x: 0.01, y: h.target_cpi, yref: 'y', xanchor: 'left', yanchor: 'bottom', text: '~2% objective (' + h.target_cpi.toFixed(1) + '% CPI-equiv)', showarrow: false, font: { size: 9, color: '#8a8a82' } }];
-  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'left', xshift: 6, yanchor: 'middle', text: 'NOW ' + last[1].toFixed(1) + '%', showarrow: false, font: { size: 9, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 2 });
+  const annotations = [{ xref: 'paper', x: 0.01, y: h.target_cpi, yref: 'y', xanchor: 'left', yanchor: 'bottom', text: '~2% objective', showarrow: false, font: { size: 11, color: '#8a8a82' } }];
+  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'left', xshift: 7, yanchor: 'middle', text: 'now ' + last[1].toFixed(1) + '%', showarrow: false, font: { size: 12, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 4 });
 
+  const pts = anchor ? anchor.points : [];
+  const xr = pts.length ? [pts[Math.max(0, pts.length - 61)][0], pts[pts.length - 1][0]] : undefined;
   Plotly.newPlot(el, traces, {
     ...CHART_LAYOUT,
     plot_bgcolor: 'transparent',
-    margin: { t: 10, b: 28, l: 10, r: 54 },
-    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M24' },
-    yaxis: { ...CHART_LAYOUT.yaxis, ticksuffix: '%' },
+    margin: { t: 10, b: 34, l: 10, r: 64 },
+    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M12', tickfont: { size: 12.5 }, range: xr },
+    yaxis: { ...CHART_LAYOUT.yaxis, ticksuffix: '%', tickfont: { size: 12.5, family: 'JetBrains Mono' } },
+    legend: { ...CHART_LAYOUT.legend, font: { size: 12.5 } },
+    hoverlabel: { ...CHART_LAYOUT.hoverlabel, font: { size: 13, family: 'DM Sans' } },
     shapes: shapes, annotations: annotations
   }, { displayModeBar: false, responsive: true });
 
-  document.getElementById('trend-meta').textContent = h.months + ' months · to ' + (last ? fmtMonth(last[0]) : fmtMonth(d.reference_month));
+  document.getElementById('trend-meta').textContent = '5-year view · to ' + (last ? fmtMonth(last[0]) : fmtMonth(d.reference_month));
   document.getElementById('trend-note').innerHTML = 'The four underlying gauges hold near the objective band; <span class="hot">headline CPI</span> (dotted) swings widest — the volatility the axis strips out by anchoring on median CPI. ' + esc(h.note);
 }
 
@@ -893,20 +897,29 @@ function renderGrowthTrend(g) {
   const rl = g.reference_lines || {};
   const hline = function (y) { return { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: y, y1: y, line: { color: y === 0 ? '#c0beb5' : '#d5d3ca', width: 1, dash: y === 0 ? 'solid' : 'dash' }, layer: 'below' }; };
   const shapes = [hline(0), hline(rl.recession_onset != null ? rl.recession_onset : -0.7), hline(rl.inflation_pressure != null ? rl.inflation_pressure : 0.7)];
-  const annotations = [];
-  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'left', xshift: 6, yanchor: 'middle', text: 'NOW ' + signedNum(last[1]), showarrow: false, font: { size: 9, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 2 });
+  const gLo = rl.recession_onset != null ? rl.recession_onset : -0.7;
+  const gHi = rl.inflation_pressure != null ? rl.inflation_pressure : 0.7;
+  const annotations = [
+    { xref: 'paper', x: 0.01, y: gHi, yref: 'y', xanchor: 'left', yanchor: 'bottom', text: '+0.70 · Fed inflation-pressure line', showarrow: false, font: { size: 10.5, color: '#8a8a82' } },
+    { xref: 'paper', x: 0.01, y: gLo, yref: 'y', xanchor: 'left', yanchor: 'top', text: '−0.70 · Fed recession line', showarrow: false, font: { size: 10.5, color: '#8a8a82' } }
+  ];
+  if (last) annotations.push({ x: last[0], y: last[1], xanchor: 'left', xshift: 7, yanchor: 'middle', text: 'now ' + signedNum(last[1]), showarrow: false, font: { size: 12, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 4 });
 
+  const gpts = ma3 ? ma3.points : [];
+  const gxr = gpts.length ? [gpts[Math.max(0, gpts.length - 61)][0], gpts[gpts.length - 1][0]] : undefined;
   Plotly.newPlot(el, traces, {
     ...CHART_LAYOUT,
     plot_bgcolor: 'transparent',
-    margin: { t: 10, b: 28, l: 10, r: 54 },
-    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M24' },
-    yaxis: { ...CHART_LAYOUT.yaxis, range: [-2.6, 1.8], zeroline: false },
+    margin: { t: 10, b: 34, l: 10, r: 64 },
+    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M12', tickfont: { size: 12.5 }, range: gxr },
+    yaxis: { ...CHART_LAYOUT.yaxis, range: [-1.3, 1.5], zeroline: false, tickfont: { size: 12.5, family: 'JetBrains Mono' } },
+    legend: { ...CHART_LAYOUT.legend, font: { size: 12.5 } },
+    hoverlabel: { ...CHART_LAYOUT.hoverlabel, font: { size: 13, family: 'DM Sans' } },
     shapes: shapes, annotations: annotations
   }, { displayModeBar: false, responsive: true });
 
-  document.getElementById('growth-trend-meta').textContent = h.months + ' months · to ' + (last ? fmtMonth(last[0]) : '—');
-  document.getElementById('growth-trend-note').innerHTML = 'The monthly CFNAI (faint) is noisy; the <strong>3-month average</strong> (ink) is the axis. Dashed lines are the Chicago Fed ±0.70 reference levels. ' + esc(h.note) + ' The 2020 shock (about −7 s.d.) falls below the visible range.';
+  document.getElementById('growth-trend-meta').textContent = '5-year view · to ' + (last ? fmtMonth(last[0]) : '—');
+  document.getElementById('growth-trend-note').innerHTML = 'The monthly CFNAI (faint) is noisy; the <strong>3-month average</strong> (ink) is the axis. Dashed lines are the Chicago Fed ±0.70 reference levels, shown for context. Showing the last five years; the 2020 pandemic collapse (about −7 s.d.) sits before this window.';
 }
 
 /* ---------- investment clock (SVG; live hand, flagged-doctrine tilts) ---------- */
@@ -1089,9 +1102,16 @@ function renderRegimeMatrix(d, g) {
   const label = regimeLabel(pos.hx, pos.vy);
   const read = document.getElementById('regime-read');
   if (read) {
-    read.innerHTML = 'The map reads <strong>' + esc(label) + '</strong> &mdash; growth ' + esc(gax.direction || 'n/a') + ' ('
-      + esc(gax.level_bucket || '') + '), inflation ' + esc(ax.direction || 'n/a') + ' (' + esc(ax.level_bucket || '') + '). '
-      + '<span class="accent">The economy circles this board clockwise; the trail is the last six months.</span>';
+    let s = 'The map reads <strong>' + esc(label) + '</strong> &mdash; growth ' + esc(gax.direction || 'n/a') + ' ('
+      + esc(gax.level_bucket || '') + '), inflation ' + esc(ax.direction || 'n/a') + ' (' + esc(ax.level_bucket || '') + '). ';
+    if (label.indexOf('boundary') >= 0) {
+      s += '<span class="accent">On the line because growth is clearly ' + esc(gax.direction || '')
+        + ' while inflation is going neither way &mdash; its level is ' + esc(ax.level_bucket || '')
+        + ', but its direction is flat, and this map reads direction, not level.</span>';
+    } else {
+      s += '<span class="accent">The economy circles this board clockwise; the trail is the last six months.</span>';
+    }
+    read.innerHTML = s;
   }
   const side = document.getElementById('regime-side');
   if (side) {
