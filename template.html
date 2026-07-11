@@ -415,33 +415,34 @@ details.evidence .ev-body .panel { margin: 0; }
     </div>
   </section>
 
-  <!-- EXPECTATIONS OVERLAY -->
+  <!-- EXPECTATIONS · COMPONENTS -->
   <section class="panel" id="panel-exp">
     <div class="panel-head">
-      <h2>Expectations overlay &middot; forward</h2>
-      <span class="meta">Market-implied and model-expected inflation. Senses turns the realised gauges confirm later.</span>
+      <h2>Expectations &middot; forward</h2>
+      <span class="meta" id="exp-meta"></span>
     </div>
     <div class="panel-body">
       <div class="exp-head">
         <span class="exp-badge exp-anchored" id="exp-badge"></span>
         <span class="exp-note" id="exp-note"></span>
       </div>
-      <div class="tbl-wrap">
-        <table class="tbl" id="exp-tbl">
+      <div class="tbl-wrap" style="margin-top:14px">
+        <table class="tbl states-tbl" id="exp-states-tbl">
           <thead>
             <tr>
               <th class="l">Measure</th>
               <th>Level</th>
               <th>3m change</th>
-              <th class="l">Role</th>
-              <th class="l">As of</th>
+              <th class="l">State</th>
               <th class="l">Source</th>
             </tr>
           </thead>
-          <tbody id="exp-body"></tbody>
+          <tbody id="exp-states-body"></tbody>
         </table>
       </div>
-      <div class="side-note" id="nowcast-note"></div>
+      <p class="mini-lead" style="margin-top:18px"><span class="hot">Amber</span> where expectations drift above the ~2% anchor band, <span class="cool">blue</span> where below, grey where anchored. Click a row to jump to its history.</p>
+      <div class="mini-grid" id="exp-mini-grid"></div>
+      <div class="side-note" id="nowcast-note" style="margin-top:18px"></div>
     </div>
   </section>
 
@@ -824,23 +825,21 @@ function renderGrowthTrend(g) {
   const h = g.history;
   if (!h || !h.series || !h.series.length) { el.className = 'plot fallback'; el.textContent = 'No trend history available.'; return; }
   if (typeof Plotly === 'undefined') { el.className = 'plot fallback'; el.textContent = 'Chart library did not load (CDN unreachable).'; return; }
-  const colors = { cfnai_ma3: '#1a1a18', cfnai: '#8a8a82' };
-  const traces = h.series.map(function (s) {
-    const isCtx = s.key === 'cfnai';
-    return {
-      x: s.points.map(function (p) { return p[0]; }),
-      y: s.points.map(function (p) { return p[1]; }),
-      name: s.name, type: 'scatter', mode: 'lines',
-      line: { color: colors[s.key] || '#5c5c56', width: isCtx ? 1 : 2.4 },
-      opacity: isCtx ? 0.5 : 1,
-      hovertemplate: '%{y:.2f}<extra>' + s.name + '</extra>'
-    };
-  });
   const ma3 = h.series.filter(function (s) { return s.key === 'cfnai_ma3'; })[0];
+  const ctx = h.series.filter(function (s) { return s.key === 'cfnai'; })[0];
+  const GB = 0.20; /* around-trend band; state-colour the MA3 above/below it */
+  const traces = [];
+  if (ctx) traces.push({ x: ctx.points.map(function (p) { return p[0]; }), y: ctx.points.map(function (p) { return p[1]; }), name: 'CFNAI (monthly)', type: 'scatter', mode: 'lines', line: { color: '#b0b0a8', width: 1 }, opacity: 0.5, hovertemplate: '%{y:.2f}<extra>CFNAI (monthly)</extra>' });
+  if (ma3) {
+    const mx = ma3.points.map(function (p) { return p[0]; }), my = ma3.points.map(function (p) { return p[1]; });
+    traces.push({ x: mx, y: my, name: 'CFNAI-MA3', type: 'scatter', mode: 'lines', line: { color: '#5c5c56', width: 1.6 }, hovertemplate: '%{y:.2f}<extra>CFNAI-MA3</extra>' });
+    traces.push({ x: mx, y: my.map(function (v) { return v > GB ? v : null; }), type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#b45309', width: 2.6 }, hoverinfo: 'skip', showlegend: false });
+    traces.push({ x: mx, y: my.map(function (v) { return v < -GB ? v : null; }), type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#2563eb', width: 2.6 }, hoverinfo: 'skip', showlegend: false });
+  }
   const last = ma3 ? ma3.points[ma3.points.length - 1] : null;
   const rl = g.reference_lines || {};
   const hline = function (y) { return { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: y, y1: y, line: { color: y === 0 ? '#c0beb5' : '#d5d3ca', width: 1, dash: y === 0 ? 'solid' : 'dash' }, layer: 'below' }; };
-  const shapes = [hline(0), hline(rl.recession_onset != null ? rl.recession_onset : -0.7), hline(rl.inflation_pressure != null ? rl.inflation_pressure : 0.7)];
+  const shapes = [{ type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: -GB, y1: GB, fillcolor: 'rgba(90,90,86,0.06)', line: { width: 0 }, layer: 'below' }, hline(0), hline(rl.recession_onset != null ? rl.recession_onset : -0.7), hline(rl.inflation_pressure != null ? rl.inflation_pressure : 0.7)];
   const gLo = rl.recession_onset != null ? rl.recession_onset : -0.7;
   const gHi = rl.inflation_pressure != null ? rl.inflation_pressure : 0.7;
   const annotations = [
@@ -863,7 +862,7 @@ function renderGrowthTrend(g) {
   }, { displayModeBar: false, responsive: true });
 
   document.getElementById('growth-trend-meta').textContent = '5-year view · to ' + (last ? fmtMonth(last[0]) : '—');
-  document.getElementById('growth-trend-note').innerHTML = 'The monthly CFNAI (faint) is noisy; the <strong>3-month average</strong> (ink) is the axis. Dashed lines are the Chicago Fed ±0.70 reference levels, shown for context. Showing the last five years; the 2020 pandemic collapse (about −7 s.d.) sits before this window.';
+  document.getElementById('growth-trend-note').innerHTML = 'The monthly CFNAI (faint) is noisy; the <strong>3-month average</strong> is the axis, turning <span class="hot">amber</span> above trend and <span class="cool">blue</span> below (the shaded band is ±0.20 around trend). Dashed lines are the Chicago Fed ±0.70 reference levels. Last five years; the 2020 collapse (about −7 s.d.) sits before this window.';
 }
 
 /* Which quadrant (or boundary) the hand points to, given the dead-band-aware
@@ -1078,39 +1077,100 @@ function renderMiniCharts(d) {
   }).join('');
   STATE_ORDER.forEach(function (k) {
     const s = histByKey[k], m = measureByKey(d, k);
-    if (s && m && !m.error) renderMiniChart('mplot-' + k, s, m);
+    if (!s || !m || m.error) return;
+    const t = TARGETS[m.key] != null ? TARGETS[m.key] : 2.4;
+    drawMini('mplot-' + k, s.points, { lo: t - 0.5, hi: t + 0.3, tgt: t, keep: 61, dp: 1 });
   });
 }
 
-function renderMiniChart(elId, series, m) {
+/* Shared small-multiple: grey base line, amber where above the band, blue where
+   below, over a shaded band and a dashed reference line. */
+function drawMini(elId, points, cfg) {
   const el = document.getElementById(elId);
   if (!el) return;
   if (typeof Plotly === 'undefined') { el.textContent = 'Chart library did not load.'; return; }
-  const pts = series.points.slice(-61);
+  const pts = cfg.keep ? points.slice(-cfg.keep) : points;
   const x = pts.map(function (p) { return p[0]; }), y = pts.map(function (p) { return p[1]; });
-  const tgt = TARGETS[m.key] != null ? TARGETS[m.key] : 2.4;
-  const hi = tgt + 0.3, lo = tgt - 0.5;
-  const above = y.map(function (v) { return v > hi ? v : null; });
-  const below = y.map(function (v) { return v < lo ? v : null; });
+  const dp = cfg.dp != null ? cfg.dp : 1;
   const traces = [
-    { x: x, y: y, type: 'scatter', mode: 'lines', line: { color: '#b0b0a8', width: 1.3 }, hovertemplate: '%{y:.1f}%<extra></extra>' },
-    { x: x, y: above, type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#b45309', width: 2.4 }, hoverinfo: 'skip' },
-    { x: x, y: below, type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#2563eb', width: 2.4 }, hoverinfo: 'skip' }
+    { x: x, y: y, type: 'scatter', mode: 'lines', line: { color: '#b0b0a8', width: 1.3 }, hovertemplate: '%{y:.' + dp + 'f}%<extra></extra>' },
+    { x: x, y: y.map(function (v) { return v > cfg.hi ? v : null; }), type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#b45309', width: 2.4 }, hoverinfo: 'skip' },
+    { x: x, y: y.map(function (v) { return v < cfg.lo ? v : null; }), type: 'scatter', mode: 'lines', connectgaps: false, line: { color: '#2563eb', width: 2.4 }, hoverinfo: 'skip' }
   ];
   const shapes = [
-    { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: lo, y1: hi, fillcolor: 'rgba(90,90,86,0.07)', line: { width: 0 }, layer: 'below' },
-    { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: tgt, y1: tgt, line: { color: '#c0beb5', width: 1, dash: 'dash' }, layer: 'below' }
+    { type: 'rect', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: cfg.lo, y1: cfg.hi, fillcolor: 'rgba(90,90,86,0.07)', line: { width: 0 }, layer: 'below' },
+    { type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: cfg.tgt, y1: cfg.tgt, line: { color: '#c0beb5', width: 1, dash: 'dash' }, layer: 'below' }
   ];
   const last = pts.length ? pts[pts.length - 1] : null;
-  const annotations = last ? [{ x: last[0], y: last[1], xanchor: 'right', xshift: -3, yanchor: 'bottom', yshift: 6, text: last[1].toFixed(1) + '%', showarrow: false, font: { size: 10, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 2 }] : [];
+  const annotations = last ? [{ x: last[0], y: last[1], xanchor: 'right', xshift: -3, yanchor: 'bottom', yshift: 6, text: last[1].toFixed(dp) + '%', showarrow: false, font: { size: 10, family: 'JetBrains Mono', color: '#ffffff' }, bgcolor: '#1a1a18', borderpad: 2 }] : [];
   Plotly.newPlot(el, traces, {
-    ...CHART_LAYOUT,
-    plot_bgcolor: 'transparent', showlegend: false, height: 170,
+    ...CHART_LAYOUT, plot_bgcolor: 'transparent', showlegend: false, height: 170,
     margin: { t: 8, b: 22, l: 8, r: 40 },
     xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M24', tickfont: { size: 10 } },
     yaxis: { ...CHART_LAYOUT.yaxis, ticksuffix: '%', tickfont: { size: 10, family: 'JetBrains Mono' } },
     shapes: shapes, annotations: annotations
   }, { displayModeBar: false, responsive: true });
+}
+
+/* ---------- expectations: states table + small-multiples ---------- */
+/* State relative to the ~2% anchor band (the 5y5y anchoring bounds 1.6-2.6). */
+function expState(level) {
+  if (level == null) return { label: 'n/a', cls: 'neutral' };
+  if (level > 2.6) return { label: 'drifting up', cls: 'hot' };
+  if (level < 1.6) return { label: 'drifting down', cls: 'cool' };
+  return { label: 'anchored', cls: 'neutral' };
+}
+
+function renderExpComponents(d) {
+  const exp = d.expectations || {};
+  const anch = exp.anchored || 'n/a';
+  const anchCls = anch === 'drifting up' ? 'hot' : anch === 'drifting down' ? 'cool' : 'neutral';
+  const badge = document.getElementById('exp-badge');
+  if (badge) badge.innerHTML = 'Long-run expectations: <span class="' + anchCls + '">' + cap(anch) + '</span>';
+  const note = document.getElementById('exp-note');
+  if (note) note.innerHTML = esc(exp.note || '') + (exp.gap_vs_realised_pp != null ? ' <span class="num" style="color:var(--t3)">(gap vs realised ' + signedPp(exp.gap_vs_realised_pp) + ')</span>' : '');
+  const rows = (exp.measures || []).filter(function (m) { return !m.error; });
+  const body = document.getElementById('exp-states-body');
+  if (body) {
+    body.innerHTML = rows.map(function (m) {
+      const st = expState(m.level);
+      const role = m.key === 'forward_5y5y' ? 'anchor' : 'expectation';
+      const chgCls = m.change_3m > 0.02 ? 'hot' : m.change_3m < -0.02 ? 'cool' : 'neutral';
+      return '<tr data-ekey="' + m.key + '">'
+        + '<td class="l"><span class="mini-name" style="font-weight:600">' + esc(m.name) + '</span><span class="type-chip ' + (role === 'anchor' ? 'tc-anchor' : 'tc-context') + '">' + role + '</span></td>'
+        + '<td class="num">' + pct(m.level, 2) + '</td>'
+        + '<td class="num ' + chgCls + '">' + signedNum(m.change_3m) + '</td>'
+        + '<td class="l"><span class="state-chip st-' + st.cls + '">' + st.label + '</span></td>'
+        + '<td class="l src">' + srcLink(m) + '</td></tr>';
+    }).join('');
+    body.querySelectorAll('tr[data-ekey]').forEach(function (tr) {
+      tr.addEventListener('click', function () { const el = document.getElementById('emini-' + tr.dataset.ekey); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+    });
+  }
+  const meta = document.getElementById('exp-meta');
+  if (meta) { const dts = rows.map(function (m) { return m.as_of; }).filter(Boolean).sort(); meta.textContent = dts.length ? 'to ' + fmtDay(dts[dts.length - 1]) : ''; }
+  renderExpMinis(exp);
+  const nc = d.nowcast || {};
+  const ncEl = document.getElementById('nowcast-note');
+  if (ncEl) {
+    if (nc.status === 'deferred') ncEl.innerHTML = '<span class="deferred">Deferred overlay</span> &nbsp; <strong>Inflation nowcast.</strong> ' + esc(nc.note) + ' <a href="' + esc(nc.source_url) + '" target="_blank" rel="noopener">Cleveland Fed ↗</a>';
+    else ncEl.style.display = 'none';
+  }
+}
+
+function renderExpMinis(exp) {
+  const grid = document.getElementById('exp-mini-grid');
+  if (!grid) return;
+  const rows = (exp.measures || []).filter(function (m) { return !m.error && m.history && m.history.length; });
+  grid.innerHTML = rows.map(function (m) {
+    const st = expState(m.level);
+    return '<div class="mini" id="emini-' + m.key + '">'
+      + '<div class="mini-head"><span class="mini-name">' + esc(m.name) + '</span><span class="state-chip st-' + st.cls + '" style="font-size:10px;padding:2px 7px">' + st.label + '</span>'
+      + '<span class="mini-now">now ' + pct(m.level, 2) + '</span></div>'
+      + '<div class="mini-plot" id="emplot-' + m.key + '"></div>'
+      + '<div class="mini-src">' + srcLink(m) + '</div></div>';
+  }).join('');
+  rows.forEach(function (m) { drawMini('emplot-' + m.key, m.history, { lo: 1.6, hi: 2.6, tgt: 2.0, keep: null, dp: 2 }); });
 }
 
 /* ---------- top-level render ---------- */
@@ -1137,7 +1197,7 @@ function render(data) {
     }
     renderStatesTable(d);
     renderMiniCharts(d);
-    buildExpectations(d);
+    renderExpComponents(d);
     /* When the evidence is folded then reopened, re-fit the width-dependent
        charts and SVGs. */
     var ev = document.getElementById('evidence');
@@ -1149,6 +1209,7 @@ function render(data) {
         renderGrowthGauge();
         var ids = ['growth-trend-chart'];
         ((d.history && d.history.series) || []).forEach(function (s) { ids.push('mplot-' + s.key); });
+        ((d.expectations && d.expectations.measures) || []).forEach(function (m) { if (m.history) ids.push('emplot-' + m.key); });
         ids.forEach(function (id) {
           var el = document.getElementById(id);
           if (el && el.data) { try { Plotly.Plots.resize(el); } catch (e) {} }

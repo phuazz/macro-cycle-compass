@@ -174,7 +174,14 @@ def compute_expectation(m: dict) -> dict:
     dates, values = _valid_pairs(*fetch_series(m["id"]))
     lookback = 63 if m["cadence"] == "daily" else 3  # ~3 months either way
     change_3m = (values[-1] - values[-1 - lookback]) if len(values) > lookback else None
-    return {"level": values[-1], "change_3m": change_3m, "as_of": dates[-1]}
+    # History for the mini-chart: weekly for daily series (every 5th print),
+    # monthly kept as-is; trimmed to roughly the last five years.
+    if m["cadence"] == "daily":
+        hist_dates, hist_values, keep = dates[::5], values[::5], 260
+    else:
+        hist_dates, hist_values, keep = dates, values, 60
+    return {"level": values[-1], "change_3m": change_3m, "as_of": dates[-1],
+            "history": _trim_history(hist_dates, hist_values, months=keep)}
 
 
 def anchoring(forward_5y5y: float | None) -> str:
@@ -248,7 +255,8 @@ def build() -> dict:
             continue
         exp_rows.append({"key": m["key"], "name": m["name"], "role": m.get("role", "expectation"),
                          "level": metrics["level"], "change_3m": metrics["change_3m"],
-                         "as_of": metrics["as_of"], "source_id": m["id"], "source_url": m["source_url"]})
+                         "as_of": metrics["as_of"], "source_id": m["id"], "source_url": m["source_url"],
+                         "history": metrics.get("history")})
     exp_by_key = {r["key"]: r for r in exp_rows if "error" not in r}
     forward = exp_by_key.get("forward_5y5y")
     market5 = exp_by_key.get("market_5y")
