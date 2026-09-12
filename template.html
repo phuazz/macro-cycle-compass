@@ -698,7 +698,15 @@ const CHART_LAYOUT = {
   margin: { t: 10, b: 10, l: 10, r: 10 },
   xaxis: {
     gridcolor: '#eeeee8', linecolor: '#d5d3ca', linewidth: 1, showgrid: false,
-    tickformat: "%b '%y", dtick: 'M2', tickfont: { size: 9 }
+    tickformat: "%b '%y", dtick: 'M2', tickfont: { size: 9 },
+    // Ticks stay coarse, but the unified hover must name the OBSERVATION.
+    // Every chart here overrides tickformat to '%Y', and with no hoverformat
+    // Plotly reused it, so the hover read a bare "2026" for every point in
+    // the year. Default to month precision because most series on this page
+    // are monthly macro releases stamped to the 1st — a day-level label there
+    // would assert a precision the data does not have. The weekly series
+    // override to day precision via hoverFormatFor() below.
+    hoverformat: '%b %Y'
   },
   yaxis: {
     gridcolor: '#f0f0ea', linecolor: '#d5d3ca', linewidth: 1, showgrid: true, gridwidth: 1,
@@ -1085,6 +1093,21 @@ function renderMiniCharts(d) {
 
 /* Shared small-multiple: grey base line, amber where above the band, blue where
    below, over a shaded band and a dashed reference line. */
+// Label the hover at the frequency the series actually carries. The pages's
+// mini-charts mix monthly macro releases (stamped to the 1st) with weekly
+// breakeven series, and one fixed format would either hide which week was
+// hovered or invent a day on a monthly print. Median gap over the tail, so a
+// single ragged interval cannot flip it.
+function hoverFormatFor(points) {
+  if (!points || points.length < 3) return '%b %Y';
+  const gaps = [];
+  for (let i = points.length - 1; i > Math.max(0, points.length - 40); i--) {
+    gaps.push((new Date(points[i][0]) - new Date(points[i - 1][0])) / 86400000);
+  }
+  gaps.sort(function (a, b) { return a - b; });
+  return gaps[Math.floor(gaps.length / 2)] >= 20 ? '%b %Y' : '%d %b %Y';
+}
+
 function drawMini(elId, points, cfg) {
   const el = document.getElementById(elId);
   if (!el) return;
@@ -1106,7 +1129,8 @@ function drawMini(elId, points, cfg) {
   Plotly.newPlot(el, traces, {
     ...CHART_LAYOUT, plot_bgcolor: 'transparent', showlegend: false, height: 170,
     margin: { t: 8, b: 22, l: 8, r: 40 },
-    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M24', tickfont: { size: 10 } },
+    xaxis: { ...CHART_LAYOUT.xaxis, tickformat: '%Y', dtick: 'M24', tickfont: { size: 10 },
+             hoverformat: hoverFormatFor(pts) },
     yaxis: { ...CHART_LAYOUT.yaxis, ticksuffix: '%', tickfont: { size: 10, family: 'JetBrains Mono' } },
     shapes: shapes, annotations: annotations
   }, { displayModeBar: false, responsive: true });
